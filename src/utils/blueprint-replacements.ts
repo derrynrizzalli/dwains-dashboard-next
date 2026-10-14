@@ -10,11 +10,13 @@ import type {
 import type { HomeAssistant } from '../types/home-assistant';
 import {
   defaultValues,
+  localizeBlueprintConfig,
   parseBlueprintYaml,
   resolveBlueprintCard,
   type ParsedBlueprint,
 } from './blueprints';
 import { getEntityRegistry } from './entity-registry';
+import { ddLang } from './localize';
 
 interface ResolveReplacementParams {
   hass: HomeAssistant;
@@ -126,7 +128,7 @@ export function resolveEntityCardConfig(params: ResolveReplacementParams): Lovel
       ...(assignment.inputs || {}),
       ...syntheticValues(params.hass, params.config, entityId),
     };
-    return resolveBlueprintCard(parsed.card, parsed.meta, values);
+    return localizeBlueprintConfig(resolveBlueprintCard(parsed.card, parsed.meta, values), ddLang(params.hass));
   } catch (e) {
     console.warn('Dwains replacement blueprint failed; using default card.', assignment.name, e);
     return defaultEntityCardConfig(entityId, params.hass);

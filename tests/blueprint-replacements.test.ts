@@ -169,6 +169,30 @@ describe('resolveEntityCardConfig', () => {
     expect(card.icon).toBe('mdi:coffee');
   });
 
+  it('shows i18n texts in the viewer language', () => {
+    const rule = assignment('Localized', 'tile', {
+      blueprint: [
+        'blueprint:',
+        '  name: Localized',
+        'card:',
+        '  type: tile',
+        '  entity: $replace_with_input_entity$',
+        '  name:',
+        '    i18n:',
+        '      en: Plug',
+        '      nl: Stekker',
+      ].join('\n'),
+    });
+    const resolve = (language: string) => resolveEntityCardConfig({
+      hass: hassWithStates([], { language, locale: { language } }),
+      config: config(rule),
+      entity: 'switch.plug',
+      surface: 'area_cards',
+    });
+    expect(resolve('nl').name).toBe('Stekker');
+    expect(resolve('fr').name).toBe('Plug');
+  });
+
   it('uses the default card when the rule is disabled', () => {
     const card = resolveEntityCardConfig({
       hass,

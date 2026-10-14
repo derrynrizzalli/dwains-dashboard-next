@@ -1,7 +1,9 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import memoizeOne from 'memoize-one';
 import type { BlueprintPage, DwainsDashboardSettings } from '../types/strategy';
-import { ddLocalize } from '../utils/localize';
+import { localizeBlueprintConfig } from '../utils/blueprints';
+import { ddLang, ddLocalize } from '../utils/localize';
 import { restrictNonAdminDashboardSettings } from '../utils/security';
 import { updateStoredDashboardStrategy } from '../utils/dashboard-config-store';
 import { showBlueprintDialog } from './utils/show-blueprint-dialog';
@@ -51,6 +53,9 @@ export class DwainsPageCard extends LitElement {
 
   private _t = (key: string, vars?: Record<string, string | number>) =>
     ddLocalize(this._hass, key, vars);
+
+  // Blueprint pages keep {i18n: ...} texts, so they follow the viewer's language.
+  private _localizedCard = memoizeOne((card: any, lang: string) => localizeBlueprintConfig(card, lang));
 
   private _canManageDashboard(): boolean {
     return !restrictNonAdminDashboardSettings(this._hass, this._settings);
@@ -200,7 +205,10 @@ export class DwainsPageCard extends LitElement {
             ` : nothing}
           </div>
         </div>
-        <dwains-dashboard-next-card-host .hass=${this._hass} .config=${page.card}></dwains-dashboard-next-card-host>
+        <dwains-dashboard-next-card-host
+          .hass=${this._hass}
+          .config=${this._localizedCard(page.card, ddLang(this._hass))}
+        ></dwains-dashboard-next-card-host>
       </div>
     `;
   }
