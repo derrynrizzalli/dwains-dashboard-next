@@ -57,13 +57,13 @@ import {
   filterHomeSceneCandidates,
   homeSceneDomain,
   moveHomeScene,
-  moveHomeSceneTo,
   normalizeHomeScenes,
   pickableHomeSceneIds,
   removeHomeScene,
   type HomeSceneCandidate,
 } from "../utils/home-scenes";
 import { DD_NEXT_VERSION } from "../version";
+import { moveItemTo, sameItems, sameOrder } from "../utils/list-order";
 import {
   isAreaLayoutDefault,
   isAreasDisplayDefault,
@@ -285,6 +285,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   /** The group order of the room in the settings was changed, so it can be copied to every room. */
   @state()
   private _areaGroupOrderChanged = false;
+
+  /**
+   * Order shown while an item of an order list is dragged. The list follows
+   * the pointer and the order is saved on drop.
+   */
+  @state()
+  private _dragPreview?: { list: string; order: readonly string[] };
 
   /** Entity groups folded in the room settings. */
   @state()
@@ -1467,11 +1474,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const areas = Object.values(this.hass.areas || {});
     const hiddenAreas = new Set(this._config.areas_display?.hidden || []);
     const sortMode = resolveAreaSortMode(this._config.areas_display);
-    const sortedAreas = sortAreas(
+    const storedAreas = sortAreas(
       areas,
       { ...this._config.areas_display, hidden: [] },
       ddLocale(this.hass)
     );
+    const areaById = new Map(storedAreas.map((area) => [area.area_id, area]));
+    const sortedAreas = this._previewOrder('areas', storedAreas.map((area) => area.area_id))
+      .map((areaId) => areaById.get(areaId)!);
     const sortModes: Array<{ mode: AreaSortMode; icon: string }> = [
       { mode: 'home_assistant', icon: 'mdi:home-assistant' },
       { mode: 'custom', icon: 'mdi:drag-vertical' },
@@ -1759,21 +1769,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       return nothing;
     }
 
-    // Get all entities for this area (from entity registry and via states)
-    const areaEntities = this._configAreaEntities(this._area);
-    const seenEntities = new Set(areaEntities.map(entity => entity.entity_id));
-
-    // Also check states for entities that might not be in registry
-    if (this.hass?.states) {
-      Object.values(this.hass.states).forEach(state => {
-        if (!seenEntities.has(state.entity_id)) {
-          const entityRegistry = getEntityRegistry(this.hass)[state.entity_id];
-          if (entityRegistry?.area_id === this._area) {
-            areaEntities.push({ entity_id: state.entity_id });
-          }
-        }
-      });
-    }
+    // Config entities of this area plus states that only the registry places here.
+    const areaEntities = this._areaEditorEntities(this._area);
 
     // Get grouped entities WITHOUT filtering hidden ones
     const groups = this._getAreaGroupedEntitiesWithoutFiltering(
@@ -1789,8 +1786,9 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const allAreaEntityIds = AREA_STRATEGY_GROUPS.flatMap((group) => groups[group] || []);
     const ungroupedOrder = areaOptions.entity_order || [];
     const sortedUngroupedEntities = this._sortEntityIds(allAreaEntityIds, ungroupedOrder);
+    const displayedUngroupedEntities = this._previewOrder(this._entityDragList(UNGROUPED_ENTITY_DRAG_GROUP), sortedUngroupedEntities);
     const customCards = this._getAreaEditorCustomCards();
-    const groupedSections = this._sortAreaStrategyGroups(
+    const storedGroupedSections = this._sortAreaStrategyGroups(
       AREA_STRATEGY_GROUPS.filter((group) =>
         (groups[group] || []).length > 0 || customCards.some((entry) =>
           entry.placement === `after:${group}` ||
@@ -1798,6 +1796,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         )
       )
     );
+    const groupedSections = this._previewOrder(`area-groups:${this._area}`, storedGroupedSections);
 
     return html`
       <div class="editor-container">
@@ -1873,10 +1872,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             </div>
             <p class="area-order-hint secondary">${this._t('settings.area_entity_order_hint')}</p>
             <div class="sortable-container dragging-enabled ${this._draggedEntityGroup === UNGROUPED_ENTITY_DRAG_GROUP ? 'dragging' : ''}">
-              ${this._getAreaEditorFreeCardsForSlot(customCards, 0, sortedUngroupedEntities, entityGroupById)
+              ${this._getAreaEditorFreeCardsForSlot(customCards, 0, displayedUngroupedEntities, entityGroupById)
                 .map((entry) => this._renderAreaCustomCardEditorRow(entry))}
               ${repeat(
-                sortedUngroupedEntities,
+                displayedUngroupedEntities,
                 (entityId) => entityId,
                 (entityId, index) => {
                   const state = this.hass!.states[entityId];
@@ -1925,7 +1924,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                         ></ha-icon-button>
                       </div>
                     </div>
-                    ${this._getAreaEditorFreeCardsForSlot(customCards, index + 1, sortedUngroupedEntities, entityGroupById)
+                    ${this._getAreaEditorFreeCardsForSlot(customCards, index + 1, displayedUngroupedEntities, entityGroupById)
                       .map((entry) => this._renderAreaCustomCardEditorRow(entry))}
                   `;
                 }
@@ -1940,18 +1939,11 @@ export class DwainsDashboardStrategyEditor extends LitElement {
           const hiddenEntities = new Set(groupOptions?.hidden || []);
           const entityOrder = groupOptions?.order || [];
 
-          // Sort entities according to order
-          const sortedEntities = [...allGroupEntities].sort((a, b) => {
-            const aIndex = entityOrder.indexOf(a);
-            const bIndex = entityOrder.indexOf(b);
-            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-            if (aIndex !== -1) return -1;
-            if (bIndex !== -1) return 1;
-            // Sort by friendly name
-            const nameA = this.hass!.states[a]?.attributes?.friendly_name || a;
-            const nameB = this.hass!.states[b]?.attributes?.friendly_name || b;
-            return nameA.localeCompare(nameB);
-          });
+          // Stored order, or the order of a drag in progress.
+          const sortedEntities = this._previewOrder(
+            this._entityDragList(group),
+            this._sortEntityIds(allGroupEntities, entityOrder)
+          );
           const groupHiddenCount = countHidden(allGroupEntities, hiddenEntities);
           const groupVisibilityState = groupVisibility(allGroupEntities.length, groupHiddenCount);
 
@@ -1959,7 +1951,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             <div
               class="area-entity-section ${groupVisibilityState === 'hidden' ? 'is-hidden' : ''} ${this._draggedEntitySection === group ? 'dragging' : ''} ${this._dragOverEntitySection === group ? 'drag-over' : ''}"
               @dragover=${(event: DragEvent) => this._handleEntitySectionDragOver(event, group)}
-              @drop=${(event: DragEvent) => this._handleEntitySectionDrop(event, group, groupedSections)}
+              @drop=${(event: DragEvent) => this._handleEntitySectionDrop(event, group, storedGroupedSections)}
             >
               <ha-expansion-panel
                 outlined
@@ -1987,13 +1979,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                       .label=${this._t('settings.move_up')}
                       .path=${mdiArrowUp}
                       .disabled=${groupIndex === 0}
-                      @click=${(event: Event) => this._moveEntitySection(event, groupedSections, groupIndex, -1)}
+                      @click=${(event: Event) => this._moveEntitySection(event, storedGroupedSections, groupIndex, -1)}
                     ></ha-icon-button>
                     <ha-icon-button
                       .label=${this._t('settings.move_down')}
                       .path=${mdiArrowDown}
                       .disabled=${groupIndex === groupedSections.length - 1}
-                      @click=${(event: Event) => this._moveEntitySection(event, groupedSections, groupIndex, 1)}
+                      @click=${(event: Event) => this._moveEntitySection(event, storedGroupedSections, groupIndex, 1)}
                     ></ha-icon-button>
                     <button
                       class="area-entity-section-handle"
@@ -2002,7 +1994,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                       title=${this._t('layout.drag_group')}
                       aria-label=${this._t('layout.drag_group')}
                       @click=${(event: Event) => event.stopPropagation()}
-                      @dragstart=${(event: DragEvent) => this._handleEntitySectionDragStart(event, group)}
+                      @dragstart=${(event: DragEvent) => this._handleEntitySectionDragStart(event, group, storedGroupedSections)}
                       @dragend=${this._handleEntitySectionDragEnd}
                     >
                       <ha-svg-icon .path=${mdiDrag}></ha-svg-icon>
@@ -2289,7 +2281,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderHomeSectionOrder() {
-    const order = this._getHomeSectionsOrder();
+    const order = this._previewOrder('home-sections', this._getHomeSectionsOrder());
     const hiddenSections = this._getHiddenHomeSections();
 
     return html`
@@ -2654,7 +2646,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderHomeCameraSettings() {
-    const cameras = this._getHomeCameraSettings();
+    const storedCameras = this._getHomeCameraSettings();
+    const cameraById = new Map(storedCameras.map(camera => [camera.entityId, camera]));
+    const cameras = this._previewOrder('home-cameras', storedCameras.map(camera => camera.entityId))
+      .map(entityId => cameraById.get(entityId)!);
     const hidden = new Set(this._config?.settings?.home_cameras_hidden || []);
     const visibleCount = cameras.filter(camera => !hidden.has(camera.entityId)).length;
 
@@ -2791,7 +2786,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderHomeScenesSettings() {
-    const picked = this._getHomeScenes();
+    const picked = this._previewOrder('home-scenes', this._getHomeScenes());
 
     return html`
       <div class="home-info-card-section home-scene-settings-section">
@@ -2942,6 +2937,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   private _handleHomeSceneDragStart(event: DragEvent, entityId: string): void {
     this._draggedHomeScene = entityId;
+    this._startDragPreview('home-scenes', this._getHomeScenes());
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', entityId);
@@ -2951,12 +2947,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeSceneDragEnd = (): void => {
     this._draggedHomeScene = undefined;
     this._dragOverHomeSceneIndex = undefined;
+    this._cancelDragPreview('home-scenes');
   };
 
   private _handleHomeSceneDragOver(event: DragEvent, index: number): void {
     if (!this._draggedHomeScene) return;
     event.preventDefault();
     this._dragOverHomeSceneIndex = index;
+    this._moveDragPreview('home-scenes', this._draggedHomeScene, index);
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
   }
 
@@ -2969,11 +2967,11 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeSceneDrop(event: DragEvent, dropIndex: number): void {
     event.preventDefault();
     const dragged = this._draggedHomeScene;
-    this._handleHomeSceneDragEnd();
     if (!dragged) return;
-    const current = this._getHomeScenes();
-    const next = moveHomeSceneTo(current, dragged, dropIndex);
-    if (next.join('|') !== current.join('|')) this._setHomeScenes(next);
+    this._moveDragPreview('home-scenes', dragged, dropIndex);
+    const next = this._finishDragPreview('home-scenes', this._getHomeScenes());
+    this._handleHomeSceneDragEnd();
+    if (next) this._setHomeScenes(next);
   }
 
   /**
@@ -3626,8 +3624,40 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     return grouped;
   }
 
+  /** The order to show: the drag preview of this list, else the stored order. */
+  private _previewOrder<T extends string>(list: string, order: readonly T[]): T[] {
+    const preview = this._dragPreview;
+    if (preview?.list === list && sameItems(preview.order, order)) return [...preview.order] as T[];
+    return [...order];
+  }
+
+  private _startDragPreview(list: string, order: readonly string[]): void {
+    this._dragPreview = { list, order: [...order] };
+  }
+
+  private _moveDragPreview(list: string, item: string | undefined, index: number): void {
+    const preview = this._dragPreview;
+    if (!item || !preview || preview.list !== list) return;
+    const next = moveItemTo(preview.order, item, index);
+    if (next !== preview.order) this._dragPreview = { list, order: next };
+  }
+
+  /** Ends the drag preview; returns its order when it differs from the stored order. */
+  private _finishDragPreview(list: string, stored: readonly string[]): string[] | undefined {
+    const preview = this._dragPreview;
+    if (preview?.list !== list) return undefined;
+    this._dragPreview = undefined;
+    if (!sameItems(preview.order, stored) || sameOrder(preview.order, stored)) return undefined;
+    return [...preview.order];
+  }
+
+  private _cancelDragPreview(list: string): void {
+    if (this._dragPreview?.list === list) this._dragPreview = undefined;
+  }
+
   private _handleHomeSectionDragStart(e: DragEvent, section: HomeSectionKey): void {
     this._draggedHomeSection = section;
+    this._startDragPreview('home-sections', this._getHomeSectionsOrder());
 
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
@@ -3638,11 +3668,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeSectionDragEnd = (): void => {
     this._draggedHomeSection = undefined;
     this._dragOverHomeSectionIndex = undefined;
+    this._cancelDragPreview('home-sections');
   };
 
   private _handleHomeSectionDragOver(e: DragEvent, index: number): void {
     e.preventDefault();
     this._dragOverHomeSectionIndex = index;
+    this._moveDragPreview('home-sections', this._draggedHomeSection, index);
 
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "move";
@@ -3664,23 +3696,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const dragged = this._draggedHomeSection;
     if (!dragged) return;
 
-    const order = this._getHomeSectionsOrder();
-    const draggedIndex = order.indexOf(dragged);
-
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._handleHomeSectionDragEnd();
-      return;
-    }
-
-    const next = [...order];
-    const [item] = next.splice(draggedIndex, 1);
-    next.splice(dropIndex, 0, item!);
-    this._setHomeSectionsOrder(next);
+    this._moveDragPreview('home-sections', dragged, dropIndex);
+    const next = this._finishDragPreview('home-sections', this._getHomeSectionsOrder());
+    if (next) this._setHomeSectionsOrder(next as HomeSectionKey[]);
     this._handleHomeSectionDragEnd();
   }
 
   private _handleHomeCameraDragStart(event: DragEvent, entityId: string): void {
     this._draggedHomeCamera = entityId;
+    this._startDragPreview('home-cameras', this._getHomeCameraSettings().map(camera => camera.entityId));
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', entityId);
@@ -3690,11 +3714,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeCameraDragEnd = (): void => {
     this._draggedHomeCamera = undefined;
     this._dragOverHomeCameraIndex = undefined;
+    this._cancelDragPreview('home-cameras');
   };
 
   private _handleHomeCameraDragOver(event: DragEvent, index: number): void {
     event.preventDefault();
     this._dragOverHomeCameraIndex = index;
+    this._moveDragPreview('home-cameras', this._draggedHomeCamera, index);
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
   }
 
@@ -3709,16 +3735,9 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const dragged = this._draggedHomeCamera;
     if (!dragged) return;
 
-    const order = this._getHomeCameraSettings().map(camera => camera.entityId);
-    const draggedIndex = order.indexOf(dragged);
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._handleHomeCameraDragEnd();
-      return;
-    }
-
-    const [camera] = order.splice(draggedIndex, 1);
-    order.splice(dropIndex, 0, camera!);
-    this._setHomeCameraOrder(order);
+    this._moveDragPreview('home-cameras', dragged, dropIndex);
+    const next = this._finishDragPreview('home-cameras', this._getHomeCameraSettings().map(camera => camera.entityId));
+    if (next) this._setHomeCameraOrder(next);
     this._handleHomeCameraDragEnd();
   }
 
@@ -3786,8 +3805,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     });
   }
 
+  /** Area ids in the order of the area list, hidden areas included. */
+  private _sortedAreaIds(): string[] {
+    return sortAreas(
+      Object.values(this.hass?.areas || {}),
+      { ...this._config?.areas_display, hidden: [] },
+      ddLocale(this.hass)
+    ).map((area) => area.area_id);
+  }
+
   private _handleAreaDragStart(e: DragEvent, areaId: string): void {
     this._draggedAreaId = areaId;
+    this._startDragPreview('areas', this._sortedAreaIds());
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', areaId);
@@ -3797,6 +3826,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleAreaDragEnd(): void {
     this._draggedAreaId = undefined;
     this._dragOverIndex = undefined;
+    this._cancelDragPreview('areas');
   }
 
   private _handleAreaDragOver(e: DragEvent, index: number): void {
@@ -3805,6 +3835,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       e.dataTransfer.dropEffect = 'move';
     }
     this._dragOverIndex = index;
+    this._moveDragPreview('areas', this._draggedAreaId, index);
   }
 
   private _handleAreaDragLeave(e: DragEvent): void {
@@ -3823,43 +3854,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       resolveAreaSortMode(this._config.areas_display) !== 'custom'
     ) return;
 
-    const areas = Object.values(this.hass!.areas || {});
-    const sortedAreas = sortAreas(
-      areas,
-      { ...this._config.areas_display, hidden: [] },
-      ddLocale(this.hass)
-    );
+    this._moveDragPreview('areas', this._draggedAreaId, dropIndex);
+    const order = this._finishDragPreview('areas', this._sortedAreaIds());
+    this._handleAreaDragEnd();
+    if (!order) return;
 
-    // Find the dragged item's current index
-    const draggedIndex = sortedAreas.findIndex(area => area.area_id === this._draggedAreaId);
-
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._draggedAreaId = undefined;
-      this._dragOverIndex = undefined;
-      return;
-    }
-
-    // Reorder the areas
-    const newSortedAreas = [...sortedAreas];
-    const [removed] = newSortedAreas.splice(draggedIndex, 1);
-    if (!removed) return;
-
-    newSortedAreas.splice(dropIndex, 0, removed);
-
-    // Create new order array
-    const order = newSortedAreas.map(area => area.area_id);
-
-    const newConfig: DwainsDashboardConfig = {
-      ...this._config!,
+    this._fireConfigChanged({
+      ...this._config,
       areas_display: {
-        ...this._config!.areas_display,
-        order
-      }
-    };
-
-    this._fireConfigChanged(newConfig);
-    this._draggedAreaId = undefined;
-    this._dragOverIndex = undefined;
+        ...this._config.areas_display,
+        order,
+      },
+    });
   }
 
   private _moveArea(areaId: string, direction: -1 | 1): void {
@@ -4063,22 +4069,31 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     this._showToast(this._t('settings.apply_group_order_all_done'));
   };
 
-  private _handleEntitySectionDragStart(event: DragEvent, group: AreaStrategyGroup): void {
+  private _handleEntitySectionDragStart(
+    event: DragEvent,
+    group: AreaStrategyGroup,
+    orderedGroups: AreaStrategyGroup[]
+  ): void {
     event.stopPropagation();
     this._handleEntityDragEnd();
     this._handleAreaCustomCardDragEnd();
     this._draggedEntitySection = group;
     this._dragOverEntitySection = undefined;
+    this._startDragPreview(`area-groups:${this._area}`, orderedGroups);
     event.dataTransfer?.setData('text/plain', group);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
   }
 
   private _handleEntitySectionDragOver(event: DragEvent, group: AreaStrategyGroup): void {
-    if (!this._draggedEntitySection) return;
+    const dragged = this._draggedEntitySection;
+    if (!dragged) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     this._dragOverEntitySection = group;
+    const list = `area-groups:${this._area}`;
+    const index = this._dragPreview?.list === list ? this._dragPreview.order.indexOf(group) : -1;
+    if (index >= 0) this._moveDragPreview(list, dragged, index);
   }
 
   private _handleEntitySectionDrop(
@@ -4091,14 +4106,9 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     event.preventDefault();
     event.stopPropagation();
 
-    const fromIndex = orderedGroups.indexOf(draggedGroup);
-    const targetIndex = orderedGroups.indexOf(targetGroup);
-    if (fromIndex >= 0 && targetIndex >= 0 && fromIndex !== targetIndex) {
-      const reordered = [...orderedGroups];
-      const [moved] = reordered.splice(fromIndex, 1);
-      if (moved) reordered.splice(targetIndex, 0, moved);
-      this._saveEntitySectionOrder(reordered);
-    }
+    this._handleEntitySectionDragOver(event, targetGroup);
+    const reordered = this._finishDragPreview(`area-groups:${this._area}`, orderedGroups);
+    if (reordered) this._saveEntitySectionOrder(reordered as AreaStrategyGroup[]);
     this._handleEntitySectionDragEnd();
   }
 
@@ -4122,6 +4132,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleEntitySectionDragEnd = (): void => {
     this._draggedEntitySection = undefined;
     this._dragOverEntitySection = undefined;
+    this._cancelDragPreview(`area-groups:${this._area}`);
   };
 
   private _handleAreaEditorDragOver(event: DragEvent, group: string, index: number): void {
@@ -4146,10 +4157,46 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     this._handleEntityDrop(event, group, index);
   }
 
+  /** Drag preview list of the entities of a group (or the free order) in this room. */
+  private _entityDragList(group: string): string {
+    return `entities:${this._area}:${group}`;
+  }
+
+  /** Entities of the room settings as listed: config entities plus states with this area in the registry. */
+  private _areaEditorEntities(areaId: string): { entity_id: string }[] {
+    const entities = this._configAreaEntities(areaId);
+    const seen = new Set(entities.map((entity) => entity.entity_id));
+    const registry = getEntityRegistry(this.hass);
+    Object.values(this.hass?.states || {}).forEach((state) => {
+      if (!seen.has(state.entity_id) && registry[state.entity_id]?.area_id === areaId) {
+        entities.push({ entity_id: state.entity_id });
+      }
+    });
+    return entities;
+  }
+
+  /** Stored order of the entities of a group, or of all entities in the free order. */
+  private _sortedGroupEntities(group: string): string[] {
+    if (!this._area || !this.hass) return [];
+    const groups = this._getAreaGroupedEntitiesWithoutFiltering(this._areaEditorEntities(this._area), this.hass);
+    const areaOptions = this._config?.areas_options?.[this._area];
+    if (group === UNGROUPED_ENTITY_DRAG_GROUP) {
+      return this._sortEntityIds(
+        AREA_STRATEGY_GROUPS.flatMap((groupKey) => groups[groupKey] || []),
+        areaOptions?.entity_order || []
+      );
+    }
+    return this._sortEntityIds(
+      groups[group as AreaStrategyGroup] || [],
+      areaOptions?.groups_options?.[group]?.order || []
+    );
+  }
+
   private _handleEntityDragStart(e: DragEvent, entityId: string, group: string): void {
     this._handleAreaCustomCardDragEnd();
     this._draggedEntityId = entityId;
     this._draggedEntityGroup = group;
+    this._startDragPreview(this._entityDragList(group), this._sortedGroupEntities(group));
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', entityId);
@@ -4157,6 +4204,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _handleEntityDragEnd(): void {
+    if (this._draggedEntityGroup) this._cancelDragPreview(this._entityDragList(this._draggedEntityGroup));
     this._draggedEntityId = undefined;
     this._draggedEntityGroup = undefined;
     this._dragOverEntityIndex = undefined;
@@ -4169,6 +4217,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     }
     if (this._draggedEntityGroup === group) {
       this._dragOverEntityIndex = index;
+      this._moveDragPreview(this._entityDragList(group), this._draggedEntityId, index);
     }
   }
 
@@ -4184,82 +4233,35 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
     if (!this._draggedEntityId || !this._config || !this._area || this._draggedEntityGroup !== group) return;
 
-    // Get entities for this group
-    const areaEntities = this._configAreaEntities(this._area);
+    const list = this._entityDragList(group);
+    this._moveDragPreview(list, this._draggedEntityId, dropIndex);
+    const order = this._finishDragPreview(list, this._sortedGroupEntities(group));
+    this._handleEntityDragEnd();
+    if (!order) return;
 
-    // Get grouped entities
-    const groups = this._getAreaGroupedEntitiesWithoutFiltering(areaEntities, this.hass!);
-    const isUngrouped = group === UNGROUPED_ENTITY_DRAG_GROUP;
-    const allGroupEntities = isUngrouped
-      ? AREA_STRATEGY_GROUPS.flatMap((groupKey) => groups[groupKey] || [])
-      : groups[group as keyof typeof groups] || [];
-    const groupOptions = this._config.areas_options?.[this._area]?.groups_options?.[group];
-    const entityOrder = isUngrouped
-      ? this._config.areas_options?.[this._area]?.entity_order || []
-      : groupOptions?.order || [];
-
-    // Sort entities according to current order
-    const sortedEntities = [...allGroupEntities].sort((a, b) => {
-      const aIndex = entityOrder.indexOf(a);
-      const bIndex = entityOrder.indexOf(b);
-      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-      if (aIndex !== -1) return -1;
-      if (bIndex !== -1) return 1;
-      const nameA = this.hass!.states[a]?.attributes?.friendly_name || a;
-      const nameB = this.hass!.states[b]?.attributes?.friendly_name || b;
-      return nameA.localeCompare(nameB);
-    });
-
-    // Find the dragged item's current index
-    const draggedIndex = sortedEntities.findIndex(entityId => entityId === this._draggedEntityId);
-
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._draggedEntityId = undefined;
-      this._draggedEntityGroup = undefined;
-      this._dragOverEntityIndex = undefined;
-      return;
-    }
-
-    // Reorder the entities
-    const newSortedEntities = [...sortedEntities];
-    const [removed] = newSortedEntities.splice(draggedIndex, 1);
-    if (!removed) return;
-
-    newSortedEntities.splice(dropIndex, 0, removed);
-
-    // Create new order array
-    const order = newSortedEntities;
-
-    if (isUngrouped) {
+    if (group === UNGROUPED_ENTITY_DRAG_GROUP) {
       this._saveUngroupedEntityOrder(order);
-      this._handleEntityDragEnd();
       return;
     }
 
-    const newConfig: DwainsDashboardConfig = {
-      ...this._config!,
+    const areaOptions = this._config.areas_options?.[this._area];
+    this._fireConfigChanged({
+      ...this._config,
       areas_options: {
-        ...this._config!.areas_options,
+        ...this._config.areas_options,
         [this._area]: {
-          ...this._config!.areas_options?.[this._area],
+          ...areaOptions,
           groups_options: {
-            ...this._config!.areas_options?.[this._area]?.groups_options,
+            ...areaOptions?.groups_options,
             [group]: {
-              ...this._config!.areas_options?.[this._area]?.groups_options?.[group],
-              order
-            }
-          }
-        }
-      }
-    };
-
-    this._fireConfigChanged(newConfig);
-    this._draggedEntityId = undefined;
-    this._draggedEntityGroup = undefined;
-    this._dragOverEntityIndex = undefined;
+              ...areaOptions?.groups_options?.[group],
+              order,
+            },
+          },
+        },
+      },
+    });
   }
-
-
 
   private _toggleAreaVisibility(area: string): void {
     const hidden = [...(this._config!.areas_display?.hidden || [])];
