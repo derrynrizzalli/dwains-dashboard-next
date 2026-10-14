@@ -2030,7 +2030,7 @@ export class DwainsLayoutCard extends LitElement {
         const areaName = this._entityAreaName(domain.entities[0]!);
         return areaName ? `${activeLabel.singular} · ${areaName}` : activeLabel.singular;
       }
-      return activeLabel.plural;
+      return activeLabel.plural(Math.max(domain.count, 2));
     }
 
     // Bij precies 1 actief: toon de ruimte ("Motion in Slaapkamer").
@@ -2058,14 +2058,16 @@ export class DwainsLayoutCard extends LitElement {
     return label.charAt(0).toLocaleUpperCase() + label.slice(1);
   }
 
-  private _statusPair(key: string, plural = true): { singular: string; plural: string } {
+  // The plural label follows the actual count, so languages with several plural
+  // forms (Russian) match the number shown in the badge.
+  private _statusPair(key: string, plural = true): { singular: string; plural: (count: number) => string } {
     return {
       singular: this._statusLabel(key, 1, plural),
-      plural: this._statusLabel(key, 2, plural),
+      plural: (count) => this._statusLabel(key, count, plural),
     };
   }
 
-  private _statusCardActiveLabel(domain: DomainCount): { singular: string; plural: string } | undefined {
+  private _statusCardActiveLabel(domain: DomainCount): { singular: string; plural: (count: number) => string } | undefined {
     if (domain.domain === 'person') return undefined;
 
     if (domain.domain === 'light') return this._statusPair('status.light_on');
