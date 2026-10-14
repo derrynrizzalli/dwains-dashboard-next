@@ -18,24 +18,22 @@ See this as Dwains Dashboard v4: totally rebuilt from scratch, with a completely
 
 ## Preview
 
+Current screenshots from **v1.11.0**, captured in October 2026. The interface is in English; room and entity names come from the Home Assistant setup.
+
 <p align="center">
-  <img src="docs/screenshots/light/desktop/home.png" alt="Dwains Dashboard Next desktop home light mode" width="920">
+  <img src="docs/screenshots/v1.11.0/desktop/home.jpg" alt="Dwains Dashboard Next 1.11.0 Home overview" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/dark/desktop/home.png" alt="Dwains Dashboard Next desktop home dark mode" width="920">
+  <img src="docs/screenshots/v1.11.0/desktop/devices-dark.jpg" alt="Dwains Dashboard Next 1.11.0 Devices overview in dark mode" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/light/desktop/devices.png" alt="Dwains Dashboard Next desktop devices page" width="920">
+  <img src="docs/screenshots/v1.11.0/mobile/home.jpg" alt="Dwains Dashboard Next 1.11.0 mobile Home" width="260">
+  <img src="docs/screenshots/v1.11.0/mobile/devices.jpg" alt="Dwains Dashboard Next 1.11.0 mobile Devices" width="260">
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/light/mobile/home.png" alt="Dwains Dashboard Next mobile home light mode" width="260">
-  <img src="docs/screenshots/dark/mobile/settings.png" alt="Dwains Dashboard Next mobile settings dark mode" width="260">
-</p>
-
-More desktop, mobile, light-mode and dark-mode screenshots are available in the [screenshot gallery](docs/screenshots.md).
+See the [screenshot gallery](docs/screenshots.md) for room controls, wall tablet settings and more views. Camera previews are hidden in the current captures.
 
 ## Documentation
 

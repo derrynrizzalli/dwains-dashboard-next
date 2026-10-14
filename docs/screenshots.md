@@ -1,10 +1,37 @@
 # Screenshots
 
-This page contains additional Dwains Dashboard Next screenshots. The main README only shows a few highlights so the project page stays readable.
+## Current gallery — v1.11.0
 
-Camera feeds in these screenshots use the privacy-safe demo images from `assets/demo-cameras`.
+Captured from Dwains Dashboard Next v1.11.0 in Chrome on October 14, 2026. The interface is in English; room and entity names reflect the example Home Assistant setup. Camera previews are hidden in these captures.
 
-## Desktop
+### Home and devices
+
+| Light mode | Dark mode |
+| --- | --- |
+| ![Home overview](screenshots/v1.11.0/desktop/home.jpg) | ![Home overview in dark mode](screenshots/v1.11.0/desktop/home-dark.jpg) |
+| ![Devices overview](screenshots/v1.11.0/desktop/devices.jpg) | ![Devices overview in dark mode](screenshots/v1.11.0/desktop/devices-dark.jpg) |
+
+### Room controls
+
+![Room header with quick controls and thermostat](screenshots/v1.11.0/desktop/room.jpg)
+
+### Wall tablet settings
+
+![Per-browser wall tablet and screensaver settings](screenshots/v1.11.0/desktop/wall-tablet.jpg)
+
+### Mobile
+
+<p>
+  <img src="screenshots/v1.11.0/mobile/home.jpg" alt="Mobile Home" width="260">
+  <img src="screenshots/v1.11.0/mobile/devices.jpg" alt="Mobile Devices" width="260">
+  <img src="screenshots/v1.11.0/mobile/room.jpg" alt="Mobile room quick controls" width="260">
+</p>
+
+## Earlier screenshots
+
+These captures document an earlier version of Next. Camera previews in this older set use the demo images from `assets/demo-cameras`.
+
+### Desktop
 
 | Light mode | Dark mode |
 | --- | --- |
@@ -12,7 +39,7 @@ Camera feeds in these screenshots use the privacy-safe demo images from `assets/
 | ![Desktop devices light](screenshots/light/desktop/devices.png) | ![Desktop devices dark](screenshots/dark/desktop/devices.png) |
 | ![Desktop settings light](screenshots/light/desktop/settings.png) | ![Desktop settings dark](screenshots/dark/desktop/settings.png) |
 
-## Mobile
+### Mobile
 
 | Light mode | Dark mode |
 | --- | --- |
@@ -20,14 +47,14 @@ Camera feeds in these screenshots use the privacy-safe demo images from `assets/
 | <img src="screenshots/light/mobile/devices.png" alt="Mobile devices light" width="260"> | <img src="screenshots/dark/mobile/devices.png" alt="Mobile devices dark" width="260"> |
 | <img src="screenshots/light/mobile/settings.png" alt="Mobile settings light" width="260"> | <img src="screenshots/dark/mobile/settings.png" alt="Mobile settings dark" width="260"> |
 
-## Area Page
+### Area Page
 
 | Light mode | Dark mode |
 | --- | --- |
 | ![Desktop area light](screenshots/light/desktop/area-woonkamer.png) | ![Desktop area dark](screenshots/dark/desktop/area-woonkamer.png) |
 | <img src="screenshots/light/mobile/area-woonkamer.png" alt="Mobile area light" width="260"> | <img src="screenshots/dark/mobile/area-woonkamer.png" alt="Mobile area dark" width="260"> |
 
-## Settings Details
+### Settings Details
 
 | Page | Desktop | Mobile |
 | --- | --- | --- |
