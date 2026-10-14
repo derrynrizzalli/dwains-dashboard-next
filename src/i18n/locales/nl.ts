@@ -818,5 +818,15 @@ export const nl = {
   'settings.hidden_with_device': "Verborgen met het apparaat",
   'settings.hidden_entities_count.one': "{count} verborgen entiteit",
   'settings.hidden_entities_count.other': "{count} verborgen entiteiten",
+  'settings.reset': "Herstellen",
+  'settings.reset_area_list': "Ruimtelijst herstellen",
+  'settings.reset_area_list_confirm': "Ruimtelijst herstellen?",
+  'settings.reset_area_list_message': "Verborgen ruimtes worden weer getoond, je eigen volgorde vervalt en de ruimtes worden alfabetisch gesorteerd.",
+  'settings.reset_room_layout': "Kamerindeling herstellen",
+  'settings.reset_room_layout_confirm': "Indeling van deze kamer herstellen?",
+  'settings.reset_room_layout_message': "Entiteiten worden weer per type gegroepeerd in de standaardvolgorde en verborgen entiteiten worden weer getoond. Je eigen kaarten blijven; kaarten tussen entiteiten gaan naar onderen.",
+  'settings.reset_devices_visibility': "Alles weer tonen",
+  'settings.reset_devices_visibility_confirm': "Alle types, apparaten en entiteiten weer tonen?",
+  'settings.reset_devices_visibility_message': "Verborgen types en entiteiten op de Apparatenpagina worden weer getoond, en verborgen apparaten worden weer getoond in heel Dwains Dashboard.",
 
 } as const satisfies TranslationDictionary;

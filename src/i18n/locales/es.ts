@@ -818,5 +818,15 @@ export const es = {
   'settings.hidden_with_device': "Oculto con el dispositivo",
   'settings.hidden_entities_count.one': "{count} entidad oculta",
   'settings.hidden_entities_count.other': "{count} entidades ocultas",
+  'settings.reset': "Restablecer",
+  'settings.reset_area_list': "Restablecer la lista de áreas",
+  'settings.reset_area_list_confirm': "¿Restablecer la lista de áreas?",
+  'settings.reset_area_list_message': "Las áreas ocultas vuelven a mostrarse, se elimina tu orden propio y las áreas se ordenan alfabéticamente.",
+  'settings.reset_room_layout': "Restablecer el diseño de la habitación",
+  'settings.reset_room_layout_confirm': "¿Restablecer el diseño de esta habitación?",
+  'settings.reset_room_layout_message': "Las entidades vuelven a agruparse por tipo en el orden predeterminado y las entidades ocultas se muestran de nuevo. Tus tarjetas se mantienen; las tarjetas entre entidades pasan al final.",
+  'settings.reset_devices_visibility': "Volver a mostrar todo",
+  'settings.reset_devices_visibility_confirm': "¿Volver a mostrar todos los tipos, dispositivos y entidades?",
+  'settings.reset_devices_visibility_message': "Los tipos y entidades ocultos en la página de dispositivos se muestran de nuevo, y los dispositivos ocultos vuelven a mostrarse en todo Dwains Dashboard.",
 
 } as const satisfies TranslationDictionary;

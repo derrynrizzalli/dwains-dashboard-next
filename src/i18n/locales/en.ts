@@ -839,6 +839,16 @@ export const en = {
   'settings.hidden_with_device': "Hidden with the device",
   'settings.hidden_entities_count.one': "{count} hidden entity",
   'settings.hidden_entities_count.other': "{count} hidden entities",
+  'settings.reset': "Reset",
+  'settings.reset_area_list': "Reset area list",
+  'settings.reset_area_list_confirm': "Reset the area list?",
+  'settings.reset_area_list_message': "Hidden areas are shown again, your own order is removed and the areas are sorted alphabetically.",
+  'settings.reset_room_layout': "Reset room layout",
+  'settings.reset_room_layout_confirm': "Reset the layout of this room?",
+  'settings.reset_room_layout_message': "Entities are grouped by type again in the default order and hidden entities are shown again. Your custom cards stay; cards placed between entities move to the bottom.",
+  'settings.reset_devices_visibility': "Show everything again",
+  'settings.reset_devices_visibility_confirm': "Show every type, device and entity again?",
+  'settings.reset_devices_visibility_message': "Hidden types and entities on the Devices page are shown again, and hidden devices are shown again in all of Dwains Dashboard.",
 
 } as const;
 

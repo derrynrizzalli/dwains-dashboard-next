@@ -818,5 +818,15 @@ export const de = {
   'settings.hidden_with_device': "Mit dem Gerät ausgeblendet",
   'settings.hidden_entities_count.one': "{count} ausgeblendete Entität",
   'settings.hidden_entities_count.other': "{count} ausgeblendete Entitäten",
+  'settings.reset': "Zurücksetzen",
+  'settings.reset_area_list': "Bereichsliste zurücksetzen",
+  'settings.reset_area_list_confirm': "Bereichsliste zurücksetzen?",
+  'settings.reset_area_list_message': "Ausgeblendete Bereiche werden wieder angezeigt, deine eigene Reihenfolge wird entfernt und die Bereiche werden alphabetisch sortiert.",
+  'settings.reset_room_layout': "Raumlayout zurücksetzen",
+  'settings.reset_room_layout_confirm': "Layout dieses Raums zurücksetzen?",
+  'settings.reset_room_layout_message': "Entitäten werden wieder nach Typ in der Standardreihenfolge gruppiert und ausgeblendete Entitäten wieder angezeigt. Deine eigenen Karten bleiben; Karten zwischen Entitäten wandern nach unten.",
+  'settings.reset_devices_visibility': "Alles wieder anzeigen",
+  'settings.reset_devices_visibility_confirm': "Alle Typen, Geräte und Entitäten wieder anzeigen?",
+  'settings.reset_devices_visibility_message': "Ausgeblendete Typen und Entitäten auf der Geräteseite werden wieder angezeigt, und ausgeblendete Geräte erscheinen wieder in ganz Dwains Dashboard.",
 
 } as const satisfies TranslationDictionary;

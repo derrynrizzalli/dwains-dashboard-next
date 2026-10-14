@@ -841,5 +841,15 @@ export const ru = {
   'settings.hidden_with_device': "Скрыто вместе с устройством",
   'settings.hidden_entities_count.one': "{count} скрытая сущность",
   'settings.hidden_entities_count.other': "{count} скрытых сущностей",
+  'settings.reset': "Сбросить",
+  'settings.reset_area_list': "Сбросить список областей",
+  'settings.reset_area_list_confirm': "Сбросить список областей?",
+  'settings.reset_area_list_message': "Скрытые области снова будут показаны, ваш порядок будет удален, а области будут отсортированы по алфавиту.",
+  'settings.reset_room_layout': "Сбросить макет комнаты",
+  'settings.reset_room_layout_confirm': "Сбросить макет этой комнаты?",
+  'settings.reset_room_layout_message': "Сущности снова группируются по типу в порядке по умолчанию, скрытые сущности снова показываются. Ваши карточки остаются; карточки между сущностями переносятся вниз.",
+  'settings.reset_devices_visibility': "Снова показать все",
+  'settings.reset_devices_visibility_confirm': "Снова показать все типы, устройства и сущности?",
+  'settings.reset_devices_visibility_message': "Скрытые типы и сущности на странице устройств снова будут показаны, а скрытые устройства снова появятся во всем Dwains Dashboard.",
 
 } as const satisfies TranslationDictionary;

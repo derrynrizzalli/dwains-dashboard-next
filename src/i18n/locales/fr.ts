@@ -818,5 +818,15 @@ export const fr = {
   'settings.hidden_with_device': "Masqué avec l'appareil",
   'settings.hidden_entities_count.one': "{count} entité masquée",
   'settings.hidden_entities_count.other': "{count} entités masquées",
+  'settings.reset': "Réinitialiser",
+  'settings.reset_area_list': "Réinitialiser la liste des zones",
+  'settings.reset_area_list_confirm': "Réinitialiser la liste des zones ?",
+  'settings.reset_area_list_message': "Les zones masquées sont de nouveau affichées, votre ordre est supprimé et les zones sont triées par ordre alphabétique.",
+  'settings.reset_room_layout': "Réinitialiser la disposition de la pièce",
+  'settings.reset_room_layout_confirm': "Réinitialiser la disposition de cette pièce ?",
+  'settings.reset_room_layout_message': "Les entités sont de nouveau regroupées par type dans l'ordre par défaut et les entités masquées réapparaissent. Vos cartes restent ; les cartes placées entre des entités passent en bas.",
+  'settings.reset_devices_visibility': "Tout afficher à nouveau",
+  'settings.reset_devices_visibility_confirm': "Afficher à nouveau tous les types, appareils et entités ?",
+  'settings.reset_devices_visibility_message': "Les types et entités masqués sur la page Appareils réapparaissent, et les appareils masqués réapparaissent dans tout Dwains Dashboard.",
 
 } as const satisfies TranslationDictionary;

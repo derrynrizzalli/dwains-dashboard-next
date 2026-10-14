@@ -816,5 +816,15 @@ export const zhHant = {
   'settings.hidden_with_device': "隨裝置一起隱藏",
   'settings.hidden_entities_count.one': "{count} 個隱藏的實體",
   'settings.hidden_entities_count.other': "{count} 個隱藏的實體",
+  'settings.reset': "重設",
+  'settings.reset_area_list': "重設區域清單",
+  'settings.reset_area_list_confirm': "要重設區域清單嗎？",
+  'settings.reset_area_list_message': "隱藏的區域會再次顯示，你的自訂順序會被移除，區域會依字母排序。",
+  'settings.reset_room_layout': "重設房間版面",
+  'settings.reset_room_layout_confirm': "要重設此房間的版面嗎？",
+  'settings.reset_room_layout_message': "實體會再次依類型以預設順序分組，隱藏的實體會再次顯示。你的自訂卡片會保留；放在實體之間的卡片會移到底部。",
+  'settings.reset_devices_visibility': "再次顯示全部",
+  'settings.reset_devices_visibility_confirm': "要再次顯示所有類型、裝置和實體嗎？",
+  'settings.reset_devices_visibility_message': "裝置頁面上隱藏的類型和實體會再次顯示，隱藏的裝置也會在整個 Dwains Dashboard 中再次顯示。",
 
 } as const satisfies TranslationDictionary;

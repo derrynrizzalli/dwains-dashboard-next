@@ -816,5 +816,15 @@ export const zhHans = {
   'settings.hidden_with_device': "随设备一起隐藏",
   'settings.hidden_entities_count.one': "{count} 个隐藏的实体",
   'settings.hidden_entities_count.other': "{count} 个隐藏的实体",
+  'settings.reset': "重设",
+  'settings.reset_area_list': "重设区域列表",
+  'settings.reset_area_list_confirm': "要重设区域列表吗？",
+  'settings.reset_area_list_message': "隐藏的区域会再次显示，你的自定义顺序会被移除，区域会按字母排序。",
+  'settings.reset_room_layout': "重设房间版面",
+  'settings.reset_room_layout_confirm': "要重设此房间的版面吗？",
+  'settings.reset_room_layout_message': "实体会再次按类型以默认顺序分组，隐藏的实体会再次显示。你的自定义卡片会保留；放在实体之间的卡片会移到底部。",
+  'settings.reset_devices_visibility': "再次显示全部",
+  'settings.reset_devices_visibility_confirm': "要再次显示所有类型、设备和实体吗？",
+  'settings.reset_devices_visibility_message': "设备页面上隐藏的类型和实体会再次显示，隐藏的设备也会在整个 Dwains Dashboard 中再次显示。",
 
 } as const satisfies TranslationDictionary;

@@ -65,6 +65,14 @@ import {
 } from "../utils/home-scenes";
 import { DD_NEXT_VERSION } from "../version";
 import {
+  isAreaLayoutDefault,
+  isAreasDisplayDefault,
+  isDeviceVisibilityDefault,
+  resetAreaLayout,
+  resetAreasDisplay,
+  resetDeviceVisibility,
+} from "../utils/settings-reset";
+import {
   countHidden,
   groupHiddenIds,
   groupVisibility,
@@ -1561,6 +1569,16 @@ export class DwainsDashboardStrategyEditor extends LitElement {
           }
         )}
       </div>
+      <div class="settings-reset-row">
+        <button
+          class="home-layout-reset"
+          type="button"
+          ?disabled=${isAreasDisplayDefault(this._config.areas_display)}
+          @click=${this._resetAreasConfiguration}
+        >
+          ${this._t('settings.reset_area_list')}
+        </button>
+      </div>
     `;
   }
 
@@ -2046,6 +2064,16 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         ${customCards.length || this._draggedAreaCustomCardId
           ? this._renderAreaCustomCardPlacement(customCards, 'bottom', this._t('layout.custom_cards_bottom'))
           : nothing}
+        <div class="settings-reset-row area-editor-reset-row">
+          <button
+            class="home-layout-reset"
+            type="button"
+            ?disabled=${isAreaLayoutDefault(areaOptions)}
+            @click=${this._resetAreaLayout}
+          >
+            ${this._t('settings.reset_room_layout')}
+          </button>
+        </div>
       </div>
     `;
   }
@@ -2969,6 +2997,16 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         <div class="device-visibility-tree">
           ${repeat(types, (type) => type.key, (type) => this._renderDeviceVisibilityType(type))}
         </div>
+        <div class="settings-reset-row">
+          <button
+            class="home-layout-reset"
+            type="button"
+            ?disabled=${isDeviceVisibilityDefault(this._config?.settings, this._config?.device_admission)}
+            @click=${this._resetDeviceVisibility}
+          >
+            ${this._t('settings.reset_devices_visibility')}
+          </button>
+        </div>
       </div>
     `;
   }
@@ -3668,6 +3706,51 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     this._setHomeCameraOrder(order);
     this._handleHomeCameraDragEnd();
   }
+
+  /** Asks before a reset that throws away choices made in the settings. */
+  private _confirmReset(title: string, message: string): Promise<boolean> {
+    return showConfirmDialog(this, {
+      hass: this.hass,
+      title,
+      message,
+      confirmLabel: this._t('settings.reset'),
+      destructive: true,
+    });
+  }
+
+  private _resetAreasConfiguration = async (): Promise<void> => {
+    if (!this._config || isAreasDisplayDefault(this._config.areas_display)) return;
+    if (!await this._confirmReset(this._t('settings.reset_area_list_confirm'), this._t('settings.reset_area_list_message'))) return;
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      areas_display: resetAreasDisplay(this._config.areas_display),
+    });
+  };
+
+  private _resetAreaLayout = async (): Promise<void> => {
+    const areaId = this._area;
+    if (!this._config || !areaId || isAreaLayoutDefault(this._config.areas_options?.[areaId])) return;
+    if (!await this._confirmReset(this._t('settings.reset_room_layout_confirm'), this._t('settings.reset_room_layout_message'))) return;
+    if (!this._config || this._area !== areaId) return;
+    this._fireConfigChanged({
+      ...this._config,
+      areas_options: {
+        ...this._config.areas_options,
+        [areaId]: resetAreaLayout(this._config.areas_options?.[areaId]),
+      },
+    });
+  };
+
+  private _resetDeviceVisibility = async (): Promise<void> => {
+    if (!this._config || isDeviceVisibilityDefault(this._config.settings, this._config.device_admission)) return;
+    if (!await this._confirmReset(this._t('settings.reset_devices_visibility_confirm'), this._t('settings.reset_devices_visibility_message'))) return;
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      ...resetDeviceVisibility(this._config.settings, this._config.device_admission),
+    });
+  };
 
   private _setAreaSortMode(sortMode: AreaSortMode): void {
     if (!this._config || !this.hass) return;
@@ -5635,6 +5718,27 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         font: inherit;
         font-weight: 700;
         cursor: pointer;
+      }
+
+      .home-layout-reset:disabled {
+        opacity: 0.42;
+        cursor: default;
+      }
+
+      .home-layout-reset:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+      }
+
+      .settings-reset-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 16px 0 0;
+      }
+
+      .area-editor-reset-row {
+        margin: 16px;
       }
 
       @media (max-width: 600px) {
