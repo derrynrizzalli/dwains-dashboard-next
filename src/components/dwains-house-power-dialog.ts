@@ -92,6 +92,7 @@ export class DwainsHousePowerDialog extends LitElement {
     return html`
       <ha-dialog
         open
+        width="large"
         @closed=${this.closeDialog}
         @cancel=${() => this.closeDialog()}
         .heading=${title}

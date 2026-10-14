@@ -299,6 +299,11 @@ export class DwainsHousePowerPanel extends LitElement {
       margin-bottom: 14px;
     }
 
+    /* Without a top room the whole house card takes the full width. */
+    .overview-grid > :only-child {
+      grid-column: 1 / -1;
+    }
+
     .card {
       min-width: 0;
       padding: 14px;

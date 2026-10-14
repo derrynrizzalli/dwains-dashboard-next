@@ -7,6 +7,8 @@ import { css } from 'lit';
  */
 export const dialogSheetStyles = css`
   :host {
+    /* Home Assistant's dialog (width="large") and the older mwc dialog. */
+    --ha-dialog-width-lg: 1200px;
     --mdc-dialog-min-width: 90vw;
     --mdc-dialog-max-width: 1200px;
     --mdc-dialog-max-height: 90vh;
