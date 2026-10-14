@@ -1,16 +1,20 @@
-import { mdiClose, mdiArrowLeft } from "@mdi/js";
+import { mdiArrowDown, mdiArrowLeft, mdiArrowUp, mdiClose, mdiDelete } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { HomeAssistant } from "../types/home-assistant";
 import type { BlueprintPage } from "../types/strategy";
 import { fireEvent } from "./utils/fire-event";
-import { ddLocalize } from "../utils/localize";
+import { ddLang, ddLocalize } from "../utils/localize";
 import {
+  blueprintText,
   parseBlueprintYaml,
   resolveBlueprintCard,
   collectCustomCardTypes,
   defaultValues,
+  validateBlueprintValues,
+  type BlueprintInput,
+  type BlueprintListRow,
   type ParsedBlueprint,
 } from "../utils/blueprints";
 
@@ -48,11 +52,16 @@ export class DwainsBlueprintDialog extends LitElement {
   private _t = (key: string, vars?: Record<string, string | number>) =>
     ddLocalize(this.hass, key, vars);
 
+  private get _lang(): string {
+    return ddLang(this.hass);
+  }
+
   @state() private _params?: BlueprintDialogParams;
   @state() private _mode: "paste" | "url" | "gallery" = "paste";
   @state() private _gallery?: GalleryItem[];
   @state() private _galleryLoading = false;
   @state() private _galleryError = "";
+  @state() private _gallerySearch = "";
   @state() private _yamlText = "";
   @state() private _url = "";
   @state() private _loadingUrl = false;
@@ -95,6 +104,7 @@ export class DwainsBlueprintDialog extends LitElement {
       }
     } else {
       this._mode = "gallery";
+      this._gallerySearch = "";
       this._yamlText = "";
       this._url = "";
       this._source = "";
@@ -130,9 +140,26 @@ export class DwainsBlueprintDialog extends LitElement {
 
   private _applyParsed(parsed: ParsedBlueprint): void {
     this._parsed = parsed;
-    this._values = defaultValues(parsed.meta);
-    this._pageName = parsed.meta.name || this._t("blueprint.new_page");
-    this._pageIcon = "mdi:puzzle";
+    this._values = { ...defaultValues(parsed.meta), ...this._suggestedValues(parsed) };
+    this._pageName = blueprintText(parsed.meta, "name", this._lang) || this._t("blueprint.new_page");
+    this._pageIcon = parsed.meta.icon || "mdi:puzzle";
+  }
+
+  // Preselect suggest_entity for entity pickers when that entity exists. A
+  // suggestion without a domain uses the input's entity_domain.
+  private _suggestedValues(parsed: ParsedBlueprint): Record<string, any> {
+    const suggestions: Record<string, any> = {};
+    const states = this.hass?.states || {};
+    for (const [key, def] of Object.entries(parsed.meta.input || {})) {
+      if (def.type !== "entity-picker" || !def.suggest_entity) continue;
+      const entityId =
+        def.suggest_entity.includes(".") || !def.entity_domain
+          ? def.suggest_entity
+          : `${def.entity_domain}.${def.suggest_entity}`;
+      if (def.entity_domain && !entityId.startsWith(`${def.entity_domain}.`)) continue;
+      if (states[entityId]) suggestions[key] = entityId;
+    }
+    return suggestions;
   }
 
   // Behoud ingevulde waarden voor velden die in de nieuwe blueprint nog bestaan.
@@ -329,8 +356,9 @@ export class DwainsBlueprintDialog extends LitElement {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const list: any[] = Array.isArray(data) ? data : data?.blueprints || [];
+      // Replace-card blueprints are assigned in the replacement manager.
       this._gallery = list
-        .filter((b) => b && b.url && b.name)
+        .filter((b) => b && b.url && b.name && String(b.type || "page").toLowerCase() === "page")
         .map((b) => ({
           name: String(b.name),
           description: b.description ? String(b.description) : undefined,
@@ -350,6 +378,19 @@ export class DwainsBlueprintDialog extends LitElement {
     }
   }
 
+  private _filteredGallery(): GalleryItem[] {
+    const query = this._gallerySearch.trim().toLowerCase();
+    const gallery = this._gallery || [];
+    if (!query) return gallery;
+    return gallery.filter((item) =>
+      [item.name, item.description, item.author, ...(item.custom_cards || [])]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }
+
   private _pickGalleryItem(item: GalleryItem): void {
     this._url = item.url;
     this._loadFromUrl();
@@ -361,17 +402,29 @@ export class DwainsBlueprintDialog extends LitElement {
   };
 
   private _renderGallery() {
+    const items = this._filteredGallery();
+    const searchLabel = this._t("blueprint.gallery_search");
     return html`
       <p class="hint">${this._t("blueprint.gallery_hint")}</p>
+      <label class="gallery-search">
+        <ha-icon icon="mdi:magnify"></ha-icon>
+        <input
+          type="search"
+          aria-label=${searchLabel}
+          placeholder=${searchLabel}
+          .value=${this._gallerySearch}
+          @input=${(e: Event) => (this._gallerySearch = (e.target as HTMLInputElement).value)}
+        />
+      </label>
       ${this._galleryError ? html`<div class="error">${this._galleryError}</div>` : nothing}
       ${this._galleryLoading
         ? html`<div class="hint">${this._t("blueprint.loading")}</div>`
         : nothing}
-      ${this._gallery && this._gallery.length === 0 && !this._galleryError
+      ${this._gallery && items.length === 0 && !this._galleryError
         ? html`<div class="hint">${this._t("blueprint.gallery_empty")}</div>`
         : nothing}
       <div class="gallery">
-        ${(this._gallery || []).map(
+        ${items.map(
           (item) => html`
             <button class="gallery-item" @click=${() => this._pickGalleryItem(item)}>
               ${item.image
@@ -429,8 +482,29 @@ export class DwainsBlueprintDialog extends LitElement {
     );
   }
 
+  private _inputLabel(key: string, def?: BlueprintInput): string {
+    return (def && blueprintText(def, "name", this._lang)) || key;
+  }
+
+  private _showError(message: string): void {
+    this._error = message;
+    void this.updateComplete.then(() =>
+      this.renderRoot.querySelector(".content > .error")?.scrollIntoView({ block: "nearest" })
+    );
+  }
+
   private _save(): void {
     if (!this._parsed || !this._params) return;
+    const problem = validateBlueprintValues(this._parsed.meta, this._values);
+    if (problem) {
+      const name = this._inputLabel(problem.key, this._parsed.meta.input?.[problem.key]);
+      this._showError(
+        problem.code === "select_entity_first"
+          ? this._t("blueprint.select_entity_first", { name })
+          : this._t("blueprint.complete_entry_required", { name })
+      );
+      return;
+    }
     let card: any;
     try {
       card = resolveBlueprintCard(this._parsed.card, this._parsed.meta, this._values);
@@ -480,7 +554,7 @@ export class DwainsBlueprintDialog extends LitElement {
         </ha-dialog-header>
 
         <div class="content">
-          ${this._error ? html`<div class="error">${this._error}</div>` : nothing}
+          ${this._error ? html`<div class="error" role="alert">${this._error}</div>` : nothing}
           ${this._parsed ? this._renderForm() : this._renderSource()}
         </div>
       </ha-dialog>
@@ -563,11 +637,12 @@ export class DwainsBlueprintDialog extends LitElement {
     const inputs = meta.input || {};
     const keys = Object.keys(inputs);
     const missing = this._missingCustomCards();
+    const description = blueprintText(meta, "description", this._lang);
 
     return html`
       <div class="meta">
-        <div class="meta-title">${meta.name}</div>
-        ${meta.description ? html`<div class="meta-desc">${meta.description}</div>` : nothing}
+        <div class="meta-title">${blueprintText(meta, "name", this._lang)}</div>
+        ${description ? html`<div class="meta-desc">${description}</div>` : nothing}
         <div class="meta-tags">
           ${meta.version ? html`<span class="chip">v${meta.version}</span>` : nothing}
           ${meta.author ? html`<span class="chip">${meta.author}</span>` : nothing}
@@ -689,18 +764,23 @@ export class DwainsBlueprintDialog extends LitElement {
     `;
   }
 
-  private _renderField(key: string, def: any) {
+  private _renderField(key: string, def: BlueprintInput) {
     const value = this._values[key];
-    const label = def.name || key;
+    const label = this._inputLabel(key, def);
+    const description = blueprintText(def, "description", this._lang);
     const type = def.type || "text-field";
 
     let control;
     switch (type) {
+      case "entity-list":
+        control = this._renderEntityList(key, def, label);
+        break;
       case "entity-picker":
         control = html`
           <ha-entity-picker
             .hass=${this.hass}
             .value=${value || ""}
+            .includeDomains=${def.entity_domain ? [def.entity_domain] : undefined}
             allow-custom-entity
             @value-changed=${(e: any) => this._setValue(key, e.detail.value)}
           ></ha-entity-picker>
@@ -755,8 +835,141 @@ export class DwainsBlueprintDialog extends LitElement {
     return html`
       <div class="field">
         <label>${label}</label>
-        ${def.description ? html`<div class="field-desc">${def.description}</div>` : nothing}
+        ${description ? html`<div class="field-desc">${description}</div>` : nothing}
         ${control}
+      </div>
+    `;
+  }
+
+  // ---- Entity list ----------------------------------------------------------
+
+  private _listRows(key: string): BlueprintListRow[] {
+    const value = this._values[key];
+    return Array.isArray(value) ? value : [];
+  }
+
+  private _updateRow(key: string, index: number, field: string, value: string): void {
+    const rows = this._listRows(key).map((row) => ({ ...row }));
+    const row = rows[index];
+    if (!row) return;
+    row[field] = value;
+    // Name a new row after the chosen entity.
+    if (field === "entity" && value && !String(row.name || "").trim()) {
+      row.name =
+        this.hass?.states?.[value]?.attributes?.friendly_name ||
+        (value.split(".")[1] || value).replace(/_/g, " ");
+    }
+    this._setValue(key, rows);
+  }
+
+  private _addRow(key: string): void {
+    this._setValue(key, [...this._listRows(key), { name: "", entity: "", icon: "" }]);
+    this._focusAfterRender(`[data-list="${CSS.escape(key)}"] .entity-row:last-of-type .entity-row-name`);
+  }
+
+  private _removeRow(key: string, index: number): void {
+    this._setValue(key, this._listRows(key).filter((_, i) => i !== index));
+    this._focusAfterRender(`[data-list="${CSS.escape(key)}"] .entity-list-add`);
+  }
+
+  private _moveRow(key: string, index: number, direction: -1 | 1): void {
+    const rows = [...this._listRows(key)];
+    const target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    [rows[index], rows[target]] = [rows[target]!, rows[index]!];
+    this._setValue(key, rows);
+  }
+
+  private _focusAfterRender(selector: string): void {
+    void this.updateComplete.then(() =>
+      (this.renderRoot.querySelector(selector) as HTMLElement | null)?.focus()
+    );
+  }
+
+  private _renderEntityList(key: string, def: BlueprintInput, label: string) {
+    const rows = this._listRows(key);
+    const optional = this._t("settings.optional");
+    // Only ask for an image when the template uses one.
+    const showImage = !!this._parsed?.raw.includes("$item.image$");
+    const addLabel = blueprintText(def, "add_label", this._lang) || this._t("blueprint.add_entry");
+
+    return html`
+      <div class="entity-list" role="group" aria-label=${label} data-list=${key}>
+        ${rows.length
+          ? nothing
+          : html`<div class="entity-list-empty">${this._t("blueprint.no_entries")}</div>`}
+        ${rows.map(
+          (row, index) => html`
+            <div
+              class="entity-row"
+              role="group"
+              aria-label=${this._t("blueprint.entry_label", { number: index + 1 })}
+            >
+              <div class="entity-row-header">
+                <input
+                  class="dd-input entity-row-name"
+                  aria-label=${this._t("blueprint.entry_name")}
+                  placeholder=${this._t("blueprint.entry_name")}
+                  .value=${String(row.name ?? "")}
+                  @input=${(e: Event) =>
+                    this._updateRow(key, index, "name", (e.target as HTMLInputElement).value)}
+                />
+                <ha-icon-button
+                  .label=${this._t("settings.move_up")}
+                  .path=${mdiArrowUp}
+                  .disabled=${index === 0}
+                  @click=${() => this._moveRow(key, index, -1)}
+                ></ha-icon-button>
+                <ha-icon-button
+                  .label=${this._t("settings.move_down")}
+                  .path=${mdiArrowDown}
+                  .disabled=${index === rows.length - 1}
+                  @click=${() => this._moveRow(key, index, 1)}
+                ></ha-icon-button>
+                <ha-icon-button
+                  .label=${this._t("blueprint.remove_entry")}
+                  .path=${mdiDelete}
+                  @click=${() => this._removeRow(key, index)}
+                ></ha-icon-button>
+              </div>
+              <ha-entity-picker
+                .hass=${this.hass}
+                .label=${this._t("blueprint.entry_entity")}
+                .value=${String(row.entity ?? "")}
+                .includeDomains=${def.entity_domain ? [def.entity_domain] : undefined}
+                allow-custom-entity
+                @value-changed=${(e: any) => this._updateRow(key, index, "entity", e.detail.value || "")}
+              ></ha-entity-picker>
+              <ha-icon-picker
+                .hass=${this.hass}
+                .label=${`${this._t("blueprint.entry_icon")} (${optional})`}
+                .value=${String(row.icon ?? "")}
+                .placeholder=${def.default_icon || ""}
+                @value-changed=${(e: any) => this._updateRow(key, index, "icon", e.detail.value || "")}
+              ></ha-icon-picker>
+              ${showImage
+                ? html`
+                    <label class="entity-row-image">
+                      <span>${this._t("blueprint.entry_image")} (${optional})</span>
+                      <input
+                        class="dd-input"
+                        type="text"
+                        inputmode="url"
+                        placeholder="/local/image.png"
+                        .value=${String(row.image ?? "")}
+                        @input=${(e: Event) =>
+                          this._updateRow(key, index, "image", (e.target as HTMLInputElement).value)}
+                      />
+                    </label>
+                  `
+                : nothing}
+            </div>
+          `
+        )}
+        <ha-button class="entity-list-add" appearance="outlined" @click=${() => this._addRow(key)}>
+          <ha-icon icon="mdi:plus"></ha-icon>
+          ${addLabel}
+        </ha-button>
       </div>
     `;
   }
@@ -899,6 +1112,48 @@ export class DwainsBlueprintDialog extends LitElement {
       .field {
         margin-bottom: 14px;
       }
+      .entity-list {
+        display: grid;
+        gap: 10px;
+      }
+      .entity-list-empty {
+        padding: 12px;
+        border: 1px dashed var(--divider-color);
+        border-radius: 10px;
+        color: var(--secondary-text-color);
+        font-size: 13px;
+      }
+      .entity-row {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid var(--divider-color);
+        border-radius: 10px;
+      }
+      .entity-row-header {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .entity-row-name {
+        flex: 1;
+        min-width: 0;
+        font-weight: 600;
+        margin-right: 4px;
+      }
+      .entity-row-image {
+        display: grid;
+        gap: 4px;
+        font-size: 13px;
+        color: var(--secondary-text-color);
+      }
+      .entity-list-add {
+        justify-self: start;
+      }
+      .entity-list-add ha-icon {
+        --mdc-icon-size: 18px;
+        margin-right: 4px;
+      }
       .field label {
         display: block;
         font-size: 14px;
@@ -943,6 +1198,36 @@ export class DwainsBlueprintDialog extends LitElement {
         padding: 8px 12px;
         margin-bottom: 12px;
         font-size: 13px;
+      }
+      .gallery-search {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 12px;
+        padding: 0 12px;
+        border: 1px solid var(--divider-color);
+        border-radius: 10px;
+        background: var(--card-background-color);
+      }
+      .gallery-search:focus-within {
+        border-color: var(--primary-color);
+      }
+      .gallery-search ha-icon {
+        --mdc-icon-size: 20px;
+        flex: 0 0 auto;
+        color: var(--secondary-text-color);
+      }
+      .gallery-search input {
+        flex: 1;
+        min-width: 0;
+        height: 42px;
+        padding: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--primary-text-color);
+        font: inherit;
+        font-size: 14px;
       }
       .gallery {
         display: grid;
