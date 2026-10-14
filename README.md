@@ -18,6 +18,10 @@ See this as Dwains Dashboard v4: totally rebuilt from scratch, with a completely
 
 ## Preview
 
+[![Watch the 22-second DD Next launch video](docs/media/dd-next-1.11-launch.jpg)](https://dwainscheeren.github.io/dwains-dashboard-next/media/dd-next-1.11-launch.mp4)
+
+[Watch the launch video](https://dwainscheeren.github.io/dwains-dashboard-next/media/dd-next-1.11-launch.mp4) · 22 seconds · 1080p · Music
+
 Current screenshots from **v1.11.0**, captured in October 2026. The interface is in English; room and entity names come from the Home Assistant setup.
 
 <p align="center">
