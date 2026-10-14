@@ -472,6 +472,7 @@ export const de = {
   'dialog.vibration_sensors': 'Vibrationssensoren',
   'dialog.no_area': 'Kein Bereich',
   'navigation.open_devices': 'Geräteansicht öffnen',
+  'navigation.view_energy_sensors': 'Energiesensoren anzeigen',
   'devices.area_power_history': 'Leistungsverlauf: {area}',
   'replacement.title': 'Blueprint-Ersetzungen',
   'replacement.domain_replacements': 'Domain-Ersetzungen',

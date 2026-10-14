@@ -472,6 +472,7 @@ export const zhHans = {
   'dialog.vibration_sensors': '振动传感器',
   'dialog.no_area': '无区域',
   'navigation.open_devices': '打开设备视图',
+  'navigation.view_energy_sensors': '查看能源传感器',
   'devices.area_power_history': '功率历史：{area}',
   'replacement.title': '蓝图取代卡片',
   'replacement.domain_replacements': '网域取代',

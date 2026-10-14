@@ -486,6 +486,7 @@ export const en = {
   'dialog.vibration_sensors': 'Vibration sensors',
   'dialog.no_area': 'No area',
   'navigation.open_devices': 'Open device view',
+  'navigation.view_energy_sensors': 'View energy sensors',
   'devices.area_power_history': 'Power history: {area}',
 
   'replacement.title': 'Blueprint replacements',

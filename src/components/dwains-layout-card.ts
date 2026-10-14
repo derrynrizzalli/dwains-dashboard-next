@@ -36,6 +36,7 @@ import { buildHousePowerUsage } from '../utils/power-usage';
 import { normalizeHomeScenes, resolveHomeSceneItems, type HomeSceneItem } from '../utils/home-scenes';
 import { formatEntityStateWithUnit, formatValueWithUnit } from '../utils/unit-format';
 import { showDomainEntitiesDialog } from './utils/show-domain-entities-dialog';
+import { showHousePowerDialog } from './utils/show-house-power-dialog';
 import { showCardEditorDialog } from './utils/show-card-editor-dialog';
 import { layoutCardStyles } from './styles/layout-card-styles';
 import { layoutControlsStyles } from './styles/layout-controls-styles';
@@ -2702,7 +2703,7 @@ export class DwainsLayoutCard extends LitElement {
     return html`
       <div
         class="home-status-card house-power-card wattage ${powerUsage.sensorCount ? 'has-power' : 'is-empty'}"
-        @click=${() => this._openDeviceDomain('energy')}
+        @click=${this._showHousePower}
         @keydown=${this._handleHousePowerKeydown}
         data-domain="wattage"
         role="button"
@@ -2809,7 +2810,14 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _handleHousePowerKeydown = (event: KeyboardEvent): void => {
-    this._handleActivationKeydown(event, () => this._openDeviceDomain('energy'));
+    this._handleActivationKeydown(event, this._showHousePower);
+  };
+
+  private _showHousePower = (): void => {
+    showHousePowerDialog(this, {
+      config: this.config,
+      onViewEnergy: () => this._openDeviceDomain('energy'),
+    });
   };
 
   private _handleHouseClimateKeydown(event: KeyboardEvent, scope: HouseClimateScope): void {

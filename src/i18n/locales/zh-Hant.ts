@@ -472,6 +472,7 @@ export const zhHant = {
   'dialog.vibration_sensors': '振動感測器',
   'dialog.no_area': '無區域',
   'navigation.open_devices': '開啟裝置檢視',
+  'navigation.view_energy_sensors': '檢視能源感測器',
   'devices.area_power_history': '功率歷史：{area}',
   'replacement.title': '藍圖取代卡片',
   'replacement.domain_replacements': '網域取代',

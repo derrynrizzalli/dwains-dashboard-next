@@ -488,6 +488,7 @@ export const ru = {
   'dialog.vibration_sensors': 'Датчики вибрации',
   'dialog.no_area': 'Без области',
   'navigation.open_devices': 'Открыть раздел устройств',
+  'navigation.view_energy_sensors': 'Показать датчики энергии',
   'devices.area_power_history': 'История мощности: {area}',
 
   'replacement.title': 'Замены шаблонов',
