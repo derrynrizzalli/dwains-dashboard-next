@@ -781,6 +781,11 @@ export const it = {
   'domain.date': 'Date',
   'domain.time': 'Orari',
   'domain.timer': 'Timer',
+  'domain.cover_openings': 'Finestre e porte',
+  'domain.cover_shading': 'Schermature solari',
+  'domain.cover_gates': 'Cancelli',
+  'domain.motion': 'Movimento e presenza',
+  'domain.safety': 'Sicurezza e allarmi',
 
   'device_class.motion': 'Movimento',
   'device_class.moving': 'Movimento',

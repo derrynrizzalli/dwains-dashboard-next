@@ -781,6 +781,11 @@ export const ru = {
   'domain.date': 'Даты',
   'domain.time': 'Время',
   'domain.timer': 'Таймеры',
+  'domain.cover_openings': 'Окна и двери',
+  'domain.cover_shading': 'Солнцезащита',
+  'domain.cover_gates': 'Ворота',
+  'domain.motion': 'Движение и присутствие',
+  'domain.safety': 'Безопасность и тревоги',
 
   'device_class.motion': 'Движение',
   'device_class.moving': 'Движение',

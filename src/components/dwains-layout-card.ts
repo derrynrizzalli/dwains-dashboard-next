@@ -28,7 +28,15 @@ import { getDeviceClassName, getDomainName } from '../utils/domain-names';
 import { filterHiddenDeviceEntities } from '../utils/device-admission';
 import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
 import { restrictNonAdminDashboardSettings } from '../utils/security';
-import { areaEntityDeviceLabel, sortAreas, stripAreaFromEntityName } from '../utils/area-entities';
+import {
+  areaEntityDeviceLabel,
+  areaGroupOrderIndex,
+  getAreaEntityGroupKey,
+  migrateAreaCardPlacement,
+  resolveAreaGroupEntityOrder,
+  sortAreas,
+  stripAreaFromEntityName,
+} from '../utils/area-entities';
 import { navigateHomeAssistant } from '../utils/navigation';
 import { syncHassDarkThemeAttribute } from '../utils/theme';
 import { HOME_SECTION_META, normalizeHiddenHomeInformationCards, normalizeHiddenHomeSections, normalizeHomeSectionsOrder } from '../utils/home-sections';
@@ -4209,7 +4217,8 @@ export class DwainsLayoutCard extends LitElement {
       ? options.custom_cards
           .map((entry: any, index: number) => ({
             id: String(entry?.id || `generated-${index}`),
-            placement: String(entry?.placement || 'bottom'),
+            // Cards in a group that was split or merged follow its entities.
+            placement: migrateAreaCardPlacement(String(entry?.placement || 'bottom')),
             card: entry?.card,
           }))
           .filter((entry: NormalizedAreaCustomCard) => entry.card && typeof entry.card === 'object')
@@ -5028,7 +5037,10 @@ export class DwainsLayoutCard extends LitElement {
       if (!grouped[groupKey]) grouped[groupKey] = [];
     });
 
-    const order = ['light', 'switch', 'cover', 'climate', 'todo', 'scene', 'event', 'motion', 'binary_sensor', 'sensor', 'media_player', 'fan', 'lock', 'camera', 'vacuum'];
+    const order = [
+      'light', 'switch', 'cover_shading', 'cover_openings', 'cover_gates', 'cover', 'climate', 'todo', 'scene',
+      'event', 'motion', 'safety', 'binary_sensor', 'sensor', 'media_player', 'fan', 'lock', 'camera', 'vacuum',
+    ];
 
     return Object.entries(grouped)
       .sort(([a], [b]) => {
@@ -5049,38 +5061,23 @@ export class DwainsLayoutCard extends LitElement {
     const configuredOrder = this.config?.areas_options?.[areaId]?.group_order || [];
     if (!configuredOrder.length) return groups;
 
-    const directOrder = new Map(configuredOrder.map((groupKey, index) => [groupKey, index]));
-    const strategyOrder: string[] = [];
-    configuredOrder.forEach((groupKey) => {
-      const strategyGroup = this._strategyGroupForMobileGroupKey(groupKey);
-      if (!strategyOrder.includes(strategyGroup)) strategyOrder.push(strategyGroup);
-    });
-    const projectedOrder = new Map(strategyOrder.map((groupKey, index) => [groupKey, index]));
-    const groupIndex = (groupKey: string): number | undefined => directOrder.get(groupKey) ??
-      projectedOrder.get(this._strategyGroupForMobileGroupKey(groupKey));
-
+    // Saved orders can hold current keys, keys of older versions and the broad
+    // settings groups; areaGroupOrderIndex reads all of them.
     return groups
-      .map((group, fallbackIndex) => ({ group, fallbackIndex }))
+      .map((group, fallbackIndex) => ({
+        group,
+        fallbackIndex,
+        orderIndex: areaGroupOrderIndex(configuredOrder, group.key),
+      }))
       .sort((a, b) => {
-        const aIndex = groupIndex(a.group.key);
-        const bIndex = groupIndex(b.group.key);
-        if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex;
-        if (aIndex !== undefined) return -1;
-        if (bIndex !== undefined) return 1;
+        const aIndex = a.orderIndex;
+        const bIndex = b.orderIndex;
+        if (aIndex !== undefined && bIndex !== undefined && aIndex !== bIndex) return aIndex - bIndex;
+        if (aIndex !== undefined && bIndex === undefined) return -1;
+        if (aIndex === undefined && bIndex !== undefined) return 1;
         return a.fallbackIndex - b.fallbackIndex;
       })
       .map(({ group }) => group);
-  }
-
-  private _strategyGroupForMobileGroupKey(groupKey: string): string {
-    if (groupKey === 'light' || groupKey === 'lights') return 'lights';
-    if (['climate', 'humidifier', 'water_heater', 'fan'].includes(groupKey)) return 'climate';
-    if (groupKey === 'cover' || groupKey === 'covers') return 'covers';
-    if (groupKey === 'media_player' || groupKey === 'media_players') return 'media_players';
-    if (['alarm_control_panel', 'lock', 'camera', 'binary_sensor', 'security'].includes(groupKey)) return 'security';
-    if (groupKey === 'motion') return 'motion';
-    if (['script', 'scene', 'automation', 'todo', 'event', 'actions'].includes(groupKey)) return 'actions';
-    return 'others';
   }
 
   private _sortAreaEntities(areaId: string, entities: EntityConfig[]): EntityConfig[] {
@@ -5101,7 +5098,7 @@ export class DwainsLayoutCard extends LitElement {
         const aMobileGroup = this._mobileEntityTypeKey(a.entity_id);
         const bMobileGroup = this._mobileEntityTypeKey(b.entity_id);
         if (aMobileGroup === bMobileGroup && aMobileGroup) {
-          const mobileGroupOrder = areaOptions?.groups_options?.[aMobileGroup]?.order || [];
+          const mobileGroupOrder = resolveAreaGroupEntityOrder(areaOptions?.groups_options, aMobileGroup);
           const aMobileIndex = mobileGroupOrder.indexOf(a.entity_id);
           const bMobileIndex = mobileGroupOrder.indexOf(b.entity_id);
           if (aMobileIndex !== -1 && bMobileIndex !== -1) return aMobileIndex - bMobileIndex;
@@ -5415,13 +5412,7 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _mobileEntityTypeKey(entityId: string): string | undefined {
-    const domain = entityId.split('.')[0];
-    if (!domain) return undefined;
-    if (domain === 'binary_sensor') {
-      const deviceClass = this.hass.states[entityId]?.attributes?.device_class;
-      return deviceClass === 'motion' ? 'motion' : 'binary_sensor';
-    }
-    return domain;
+    return getAreaEntityGroupKey(entityId, this.hass.states[entityId]) || undefined;
   }
 
   private _mobileGroupName(key: string): string {
@@ -5430,6 +5421,10 @@ export class DwainsLayoutCard extends LitElement {
 
   private _mobileGroupIcon(key: string): string {
     if (key === 'motion') return 'mdi:motion-sensor';
+    if (key === 'safety') return 'mdi:shield-alert-outline';
+    if (key === 'cover_openings') return 'mdi:door-open';
+    if (key === 'cover_shading') return 'mdi:blinds-horizontal';
+    if (key === 'cover_gates') return 'mdi:gate';
     return getDomainIcon(key);
   }
 

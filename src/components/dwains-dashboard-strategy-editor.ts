@@ -28,6 +28,7 @@ import { openReplacementManager } from "./dwains-replacement-manager-dialog";
 import {
   AREA_STRATEGY_GROUPS,
   AREA_STRATEGY_GROUP_ICONS,
+  areaStrategyGroupForKey,
   resolveAreaSortMode,
   sortAreas,
   type AreaStrategyGroup
@@ -3804,18 +3805,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     });
   }
 
+  // Room pages save their own group keys (cover_shading, safety, ...); the
+  // shared mapping puts them in the broad group shown here.
   private _strategyGroupForOrderKey(groupKey: string): AreaStrategyGroup {
-    if ((AREA_STRATEGY_GROUPS as readonly string[]).includes(groupKey)) {
-      return groupKey as AreaStrategyGroup;
-    }
-    if (groupKey === 'light') return 'lights';
-    if (['climate', 'humidifier', 'water_heater', 'fan'].includes(groupKey)) return 'climate';
-    if (groupKey === 'cover') return 'covers';
-    if (groupKey === 'media_player') return 'media_players';
-    if (['alarm_control_panel', 'lock', 'camera', 'binary_sensor'].includes(groupKey)) return 'security';
-    if (groupKey === 'motion') return 'motion';
-    if (['script', 'scene', 'automation', 'todo', 'event'].includes(groupKey)) return 'actions';
-    return 'others';
+    return areaStrategyGroupForKey(groupKey);
   }
 
   private _sortAreaStrategyGroups(groups: readonly AreaStrategyGroup[]): AreaStrategyGroup[] {

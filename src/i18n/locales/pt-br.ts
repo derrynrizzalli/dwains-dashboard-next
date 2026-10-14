@@ -781,6 +781,11 @@ export const ptBR = {
   'domain.date': 'Datas',
   'domain.time': 'Horários',
   'domain.timer': 'Temporizadores',
+  'domain.cover_openings': 'Janelas e portas',
+  'domain.cover_shading': 'Proteção solar',
+  'domain.cover_gates': 'Portões',
+  'domain.motion': 'Movimento e presença',
+  'domain.safety': 'Segurança e alarmes',
 
   'device_class.motion': 'Movimento',
   'device_class.moving': 'Movimento',
