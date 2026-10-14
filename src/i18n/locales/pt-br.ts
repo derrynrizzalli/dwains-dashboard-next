@@ -827,4 +827,6 @@ export const ptBR = {
   'home_section.now_playing.description': "O que está tocando nos seus reprodutores de mídia, com reproduzir/pausar e próxima faixa. No celular a barra flutua acima da navegação.",
   'settings.show_area_now_playing': "Mostrar Tocando agora nas páginas dos cômodos",
   'settings.show_area_now_playing_description': "Mostra a barra Tocando agora abaixo do cabeçalho do cômodo, com os reprodutores de todos os cômodos. A seção da página inicial é ligada nas configurações da página inicial.",
+  'settings.show_area_favorites': "Mostrar favoritos nas páginas dos cômodos",
+  'settings.show_area_favorites_description': "Os favoritos de um cômodo aparecem como grupo no topo da página dele. O grupo pode ser recolhido.",
 } as const satisfies TranslationDictionary;

@@ -14,7 +14,7 @@ import { ManagedSubscription } from '../utils/managed-subscription';
 import { updateStoredDashboardStrategy } from '../utils/dashboard-config-store';
 import { formatClock, msUntilNextMinute } from '../utils/clock';
 import { isHiddenAsUnavailable, splitHiddenUnavailableEntities } from '../utils/entity-availability';
-import { getAreaConfigMap, getHiddenPersonIdSet, resolveStatusEntityAreaId } from '../utils/entity-lookups';
+import { getAreaConfigMap, getEntityConfigMap, getHiddenPersonIdSet, resolveStatusEntityAreaId } from '../utils/entity-lookups';
 import { getDomainStates } from '../utils/state-index';
 import {
   hasRelevantStateChange,
@@ -77,6 +77,7 @@ type PictureTextTone = 'light' | 'dark';
 type PictureContrastCacheValue = PictureTextTone | 'pending';
 const SIDEBAR_WIDTH_STORAGE_KEY = 'dd-next-area-sidebar-width';
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'dd-next-area-sidebar-collapsed';
+const AREA_FAVORITES_COLLAPSED_STORAGE_KEY = 'dd-next-area-favorites-collapsed';
 const AREA_EDIT_MODE_STORAGE_KEY = 'dd-next-area-edit-mode';
 const AREA_EDIT_MODE_RESTORE_MS = 30000;
 const OPTIMISTIC_ENTITY_STATE_TTL = 5000;
@@ -218,6 +219,7 @@ export class DwainsLayoutCard extends LitElement {
   @state() private _homeSceneAnnouncement = '';
   @state() private _areaSidebarWidth = SIDEBAR_DEFAULT_WIDTH;
   @state() private _areaSidebarCollapsed = false;
+  @state() private _areaFavoritesCollapsed = false;
   @state() private _isResizingSidebar = false;
   @state() private _repairsIssueCount = 0;
   @state() private _discoveredDeviceCount = 0;
@@ -488,6 +490,7 @@ export class DwainsLayoutCard extends LitElement {
     this._loadMobileEntityLayoutPreference();
     this._loadAreaSidebarWidthPreference();
     this._loadAreaSidebarCollapsedPreference();
+    this._loadAreaFavoritesCollapsedPreference();
     this._checkMobile();
     this._setupEventListeners();
     window.addEventListener('dwains-dashboard-next-toggle-area-nav', this._handleAreaNavToggle);
@@ -949,6 +952,23 @@ export class DwainsLayoutCard extends LitElement {
       // Preference persistence is best-effort only.
     }
   }
+
+  private _loadAreaFavoritesCollapsedPreference(): void {
+    try {
+      this._areaFavoritesCollapsed = window.localStorage.getItem(AREA_FAVORITES_COLLAPSED_STORAGE_KEY) === 'true';
+    } catch {
+      // Preference persistence is best-effort only.
+    }
+  }
+
+  private _toggleAreaFavoritesCollapsed = (): void => {
+    this._areaFavoritesCollapsed = !this._areaFavoritesCollapsed;
+    try {
+      window.localStorage.setItem(AREA_FAVORITES_COLLAPSED_STORAGE_KEY, this._areaFavoritesCollapsed ? 'true' : 'false');
+    } catch {
+      // Preference persistence is best-effort only.
+    }
+  };
 
   private _saveAreaSidebarCollapsedPreference(collapsed: boolean): void {
     try {
@@ -3848,6 +3868,7 @@ export class DwainsLayoutCard extends LitElement {
         </header>
 
         ${!this._isMobile ? this._renderNowPlayingBar(false) : nothing}
+        ${this._renderAreaFavorites(area)}
         ${this._renderCustomCardSlot(area.area_id, 'top', this._t('layout.custom_cards_top'))}
         ${this._renderMobileEntitiesSection(area, areaEntities)}
         ${this._renderCustomCardSlot(area.area_id, 'bottom', this._t('layout.custom_cards_bottom'))}
@@ -3856,6 +3877,62 @@ export class DwainsLayoutCard extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  /** The dashboard favorites, manual and suggested, that belong to this room. */
+  private _getAreaFavoriteEntities(areaId: string): string[] {
+    if (this.config?.settings?.show_area_favorites === false) return [];
+    return this._getEffectiveFavoriteEntities().filter(entityId =>
+      resolveStatusEntityAreaId(this.hass, this.config, entityId) === areaId
+    );
+  }
+
+  /** Foldable group with the favorites of this room, above the generated groups. */
+  private _renderAreaFavorites(area: AreaConfig) {
+    if (this._editMode) return nothing;
+    const favorites = this._getAreaFavoriteEntities(area.area_id);
+    if (!favorites.length) return nothing;
+
+    const collapsed = this._areaFavoritesCollapsed;
+    const railId = `dd-area-favorites-${area.area_id}`;
+    return html`
+      <section class="mobile-entities-section area-favorites-section layout-${this._mobileEntityLayout}">
+        <div class="mobile-domain-group area-favorites-group ${collapsed ? 'is-collapsed' : ''}">
+          <div class="mobile-domain-header">
+            <button
+              class="area-favorites-toggle"
+              type="button"
+              aria-expanded=${collapsed ? 'false' : 'true'}
+              aria-controls=${railId}
+              title=${this._t(collapsed ? 'favorites.show_header' : 'favorites.hide_header')}
+              @click=${this._toggleAreaFavoritesCollapsed}
+            >
+              <span class="mobile-section-icon" aria-hidden="true">
+                <ha-icon icon="mdi:star"></ha-icon>
+              </span>
+              <span class="mobile-domain-title-copy">
+                <span class="mobile-domain-title-label">${this._t('favorites.title')}</span>
+                <span class="mobile-domain-count">(${this._tp('common.item', favorites.length)})</span>
+              </span>
+              <ha-icon class="area-favorites-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+            </button>
+          </div>
+          ${collapsed ? nothing : html`
+            <div class="mobile-entity-rail" id=${railId}>
+              ${repeat(
+                favorites,
+                entityId => entityId,
+                entityId => this._renderMobileEntityCard(area, this._favoriteEntityConfig(entityId))
+              )}
+            </div>
+          `}
+        </div>
+      </section>
+    `;
+  }
+
+  private _favoriteEntityConfig(entityId: string): EntityConfig {
+    return getEntityConfigMap(this.config).get(entityId) || { entity_id: entityId };
   }
 
   private _renderEmptyState(icon: string, title: string, text: string, actions: unknown = nothing) {

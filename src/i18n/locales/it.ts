@@ -827,4 +827,6 @@ export const it = {
   'home_section.now_playing.description': "Cosa è in riproduzione sui tuoi lettori multimediali, con riproduci/pausa e brano successivo. Sui telefoni la barra fluttua sopra la navigazione.",
   'settings.show_area_now_playing': "Mostra In riproduzione nelle pagine delle stanze",
   'settings.show_area_now_playing_description': "Mostra la barra In riproduzione sotto l'intestazione della stanza, con i lettori di tutte le stanze. La sezione della Home si attiva nelle impostazioni della pagina iniziale.",
+  'settings.show_area_favorites': "Mostra i preferiti nelle pagine delle stanze",
+  'settings.show_area_favorites_description': "I preferiti di una stanza compaiono come gruppo in cima alla sua pagina. Il gruppo si può comprimere.",
 } as const satisfies TranslationDictionary;

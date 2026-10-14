@@ -1353,6 +1353,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             <p class="toggle-description">${this._t('thermostat.setting_description')}</p>
           </div>
           <div class="hide-unavailable-toggle">
+            <ha-formfield .label=${this._t('settings.show_area_favorites')}>
+              <ha-switch
+                .checked=${this._config?.settings?.show_area_favorites !== false}
+                @change=${this._toggleAreaFavorites}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">${this._t('settings.show_area_favorites_description')}</p>
+          </div>
+          <div class="hide-unavailable-toggle">
             <ha-formfield .label=${this._t('settings.show_area_now_playing')}>
               <ha-switch
                 .checked=${isAreaNowPlayingEnabled(this._config?.settings)}
@@ -4658,6 +4667,17 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       settings: {
         ...this._config.settings,
         hide_area_name_in_entity_names: Boolean((e.target as any).checked),
+      },
+    });
+  };
+
+  private _toggleAreaFavorites = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      settings: {
+        ...this._config.settings,
+        show_area_favorites: Boolean((e.target as any).checked),
       },
     });
   };

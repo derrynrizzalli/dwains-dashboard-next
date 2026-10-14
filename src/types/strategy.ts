@@ -83,6 +83,8 @@ export interface DwainsDashboardSettings {
   home_scenes?: string[];
   /** Thermostat in the room header for rooms with one climate entity. Default on. */
   show_area_thermostat?: boolean;
+  /** Favorites of the room as a foldable group on the room page. Default on. */
+  show_area_favorites?: boolean;
   /**
    * Show the Now playing bar on the room pages. When not set, the room pages
    * follow `now_playing_bar === 'all'`.

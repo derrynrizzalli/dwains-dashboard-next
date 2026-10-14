@@ -802,5 +802,7 @@ export const zhHans = {
   'home_section.now_playing.description': "显示媒体播放器正在播放的内容，并提供播放/暂停和下一曲。在手机上，它会悬浮在导航栏上方。",
   'settings.show_area_now_playing': "在房间页面显示正在播放",
   'settings.show_area_now_playing_description': "在房间标头下方显示正在播放栏，包含所有房间的播放器。首页上的区段可在首页设置中开启或关闭。",
+  'settings.show_area_favorites': "在房间页面显示我的最爱",
+  'settings.show_area_favorites_description': "房间的我的最爱会以群组显示在该房间页面顶部。群组可以折叠。",
 
 } as const satisfies TranslationDictionary;

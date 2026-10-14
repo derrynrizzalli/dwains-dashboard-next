@@ -827,5 +827,7 @@ export const ru = {
   'home_section.now_playing.description': "Что играет на ваших медиаплеерах, с кнопками воспроизведения/паузы и следующего трека. На телефонах панель плавает над навигацией.",
   'settings.show_area_now_playing': "Показывать «Сейчас играет» на страницах комнат",
   'settings.show_area_now_playing_description': "Показывает панель «Сейчас играет» под заголовком комнаты с плеерами всех комнат. Раздел на главной странице включается в настройках главной страницы.",
+  'settings.show_area_favorites': "Показывать избранное на страницах комнат",
+  'settings.show_area_favorites_description': "Избранное комнаты показывается группой вверху ее страницы. Группу можно свернуть.",
 
 } as const satisfies TranslationDictionary;

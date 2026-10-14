@@ -804,5 +804,7 @@ export const fr = {
   'home_section.now_playing.description': "Ce qui est lu sur vos lecteurs multimédias, avec lecture/pause et piste suivante. Sur téléphone, la barre flotte au-dessus de la navigation.",
   'settings.show_area_now_playing': "Afficher la barre En cours de lecture sur les pages des pièces",
   'settings.show_area_now_playing_description': "Affiche la barre En cours de lecture sous l'en-tête de la pièce, avec les lecteurs de toutes les pièces. La section de l'accueil s'active dans les réglages de la page d'accueil.",
+  'settings.show_area_favorites': "Afficher les favoris sur les pages des pièces",
+  'settings.show_area_favorites_description': "Les favoris d'une pièce apparaissent en groupe en haut de sa page. Le groupe peut être replié.",
 
 } as const satisfies TranslationDictionary;

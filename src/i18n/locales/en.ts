@@ -825,6 +825,8 @@ export const en = {
   'home_section.now_playing.description': "What is playing on your media players, with play/pause and next track. On phones it floats above the navigation.",
   'settings.show_area_now_playing': "Show Now playing on room pages",
   'settings.show_area_now_playing_description': "Shows the Now playing bar below the room header, with the players of every room. Turn the Home section on or off in the Home page settings.",
+  'settings.show_area_favorites': "Show favorites on room pages",
+  'settings.show_area_favorites_description': "The favorites of a room appear as a group at the top of its page. The group can be folded.",
 
 } as const;
 

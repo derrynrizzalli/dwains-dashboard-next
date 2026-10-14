@@ -804,5 +804,7 @@ export const nl = {
   'home_section.now_playing.description': "Wat er op je mediaspelers speelt, met afspelen/pauzeren en volgend nummer. Op telefoons zweeft de balk boven de navigatie.",
   'settings.show_area_now_playing': "Nu aan het spelen tonen op kamerpagina's",
   'settings.show_area_now_playing_description': "Toont de Nu aan het spelen-balk onder de kamerkop, met de spelers van alle kamers. De sectie op Home zet je aan of uit bij de instellingen van de startpagina.",
+  'settings.show_area_favorites': "Favorieten tonen op kamerpagina's",
+  'settings.show_area_favorites_description': "De favorieten van een kamer staan als groep bovenaan de kamerpagina. De groep kan worden ingeklapt.",
 
 } as const satisfies TranslationDictionary;

@@ -804,5 +804,7 @@ export const de = {
   'home_section.now_playing.description': "Was auf deinen Mediaplayern läuft, mit Wiedergabe/Pause und nächstem Titel. Auf Smartphones schwebt die Leiste über der Navigation.",
   'settings.show_area_now_playing': "Aktuelle Wiedergabe auf Raumseiten anzeigen",
   'settings.show_area_now_playing_description': "Zeigt die Leiste Aktuelle Wiedergabe unter der Raum-Kopfzeile, mit den Playern aller Räume. Den Abschnitt auf der Startseite schaltest du in den Einstellungen der Startseite ein oder aus.",
+  'settings.show_area_favorites': "Favoriten auf Raumseiten anzeigen",
+  'settings.show_area_favorites_description': "Die Favoriten eines Raums erscheinen als Gruppe oben auf seiner Seite. Die Gruppe lässt sich einklappen.",
 
 } as const satisfies TranslationDictionary;

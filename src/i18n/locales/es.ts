@@ -804,5 +804,7 @@ export const es = {
   'home_section.now_playing.description': "Lo que suena en tus reproductores multimedia, con reproducir/pausar y siguiente pista. En el móvil la barra flota sobre la navegación.",
   'settings.show_area_now_playing': "Mostrar Reproduciendo ahora en las páginas de habitaciones",
   'settings.show_area_now_playing_description': "Muestra la barra Reproduciendo ahora bajo el encabezado de la habitación, con los reproductores de todas las habitaciones. La sección de Inicio se activa en los ajustes de la página de inicio.",
+  'settings.show_area_favorites': "Mostrar favoritos en las páginas de habitaciones",
+  'settings.show_area_favorites_description': "Los favoritos de una habitación aparecen como grupo en la parte superior de su página. El grupo se puede plegar.",
 
 } as const satisfies TranslationDictionary;
