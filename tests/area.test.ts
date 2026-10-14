@@ -8,9 +8,17 @@ import {
 } from '../src/utils/area';
 import {
   areaEntityDeviceLabel,
+  areaGroupOrderIndex,
+  areaStrategyGroupForKey,
+  getAreaEntityGroupKey,
   getAreaGroupedEntities,
   getAreaGroupedEntitiesFromConfig,
+  groupAreaCovers,
+  legacyAreaGroupKeys,
+  migrateAreaCardPlacement,
+  resolveAreaGroupEntityOrder,
   resolveAreaSortMode,
+  selectAreaCovers,
   sortAreas,
   stripAreaFromEntityName,
 } from '../src/utils/area-entities';
@@ -281,5 +289,177 @@ describe('area entity grouping', () => {
     expect(grouped.lights).toEqual(['light.a', 'light.b']);
     expect(grouped.security).toEqual(['lock.front']);
     expect(getAreaGroupedEntities('kitchen', hass).lights).toEqual([]);
+  });
+});
+
+describe('getAreaEntityGroupKey', () => {
+  const key = (entityId: string, deviceClass?: string) =>
+    getAreaEntityGroupKey(entityId, entityState(entityId, 'off', deviceClass ? { device_class: deviceClass } : {}));
+
+  it('sorts covers into openings, shading and gates by device class', () => {
+    expect(key('cover.front_door', 'door')).toBe('cover_openings');
+    expect(key('cover.skylight', 'window')).toBe('cover_openings');
+    expect(key('cover.garage', 'garage')).toBe('cover_gates');
+    expect(key('cover.driveway', 'gate')).toBe('cover_gates');
+    for (const deviceClass of ['blind', 'shade', 'shutter', 'curtain', 'awning', 'damper']) {
+      expect(key(`cover.${deviceClass}`, deviceClass)).toBe('cover_shading');
+    }
+    expect(key('cover.unknown_type')).toBe('cover_shading');
+  });
+
+  it('ignores the case of the device class', () => {
+    expect(key('cover.garage', 'Garage')).toBe('cover_gates');
+    expect(key('binary_sensor.front', 'DOOR')).toBe('cover_openings');
+  });
+
+  it('groups binary sensors by meaning', () => {
+    for (const deviceClass of ['door', 'window', 'opening']) {
+      expect(key('binary_sensor.contact', deviceClass)).toBe('cover_openings');
+    }
+    for (const deviceClass of ['garage_door', 'gate']) {
+      expect(key('binary_sensor.gate', deviceClass)).toBe('cover_gates');
+    }
+    for (const deviceClass of ['motion', 'moving', 'occupancy', 'presence']) {
+      expect(key('binary_sensor.room', deviceClass)).toBe('motion');
+    }
+    for (const deviceClass of ['smoke', 'gas', 'carbon_monoxide', 'moisture', 'safety', 'tamper', 'problem', 'heat', 'cold']) {
+      expect(key('binary_sensor.alert', deviceClass)).toBe('safety');
+    }
+    expect(key('binary_sensor.battery', 'battery')).toBe('binary_sensor');
+    expect(key('binary_sensor.no_class')).toBe('binary_sensor');
+  });
+
+  it('puts alarm panels with safety and input selects with selects', () => {
+    expect(key('alarm_control_panel.house')).toBe('safety');
+    expect(key('input_select.mode')).toBe('select');
+    expect(key('select.fan_speed')).toBe('select');
+  });
+
+  it('keeps the domain for every other entity', () => {
+    expect(key('light.ceiling')).toBe('light');
+    expect(key('input_boolean.guest_mode')).toBe('input_boolean');
+    expect(key('sensor.temperature', 'temperature')).toBe('sensor');
+  });
+
+  it('falls back to the registry device class without a state', () => {
+    expect(getAreaEntityGroupKey('cover.garage', undefined, { original_device_class: 'garage' })).toBe('cover_gates');
+    expect(getAreaEntityGroupKey('binary_sensor.hall', null, { device_class: 'presence' })).toBe('motion');
+  });
+});
+
+describe('room group compatibility with older configs', () => {
+  it('maps room groups to the broad settings groups', () => {
+    expect(areaStrategyGroupForKey('cover_shading')).toBe('covers');
+    expect(areaStrategyGroupForKey('cover_openings')).toBe('covers');
+    expect(areaStrategyGroupForKey('cover_gates')).toBe('covers');
+    expect(areaStrategyGroupForKey('cover')).toBe('covers');
+    expect(areaStrategyGroupForKey('safety')).toBe('security');
+    expect(areaStrategyGroupForKey('motion')).toBe('motion');
+    expect(areaStrategyGroupForKey('light')).toBe('lights');
+    expect(areaStrategyGroupForKey('select')).toBe('others');
+    expect(areaStrategyGroupForKey('covers')).toBe('covers');
+  });
+
+  it('lists the keys older versions saved for a group', () => {
+    expect(legacyAreaGroupKeys('cover_gates')).toEqual(['cover_shading', 'cover']);
+    expect(legacyAreaGroupKeys('cover_shading')).toEqual(['cover']);
+    expect(legacyAreaGroupKeys('cover_openings')).toEqual(['cover']);
+    expect(legacyAreaGroupKeys('select')).toEqual(['input_select']);
+    expect(legacyAreaGroupKeys('light')).toEqual([]);
+  });
+
+  it('reads a group order saved with the single cover group', () => {
+    const order = ['cover', 'light', 'motion'];
+    expect(areaGroupOrderIndex(order, 'cover_shading')).toBe(0);
+    expect(areaGroupOrderIndex(order, 'cover_openings')).toBe(0);
+    expect(areaGroupOrderIndex(order, 'cover_gates')).toBe(0);
+    expect(areaGroupOrderIndex(order, 'light')).toBe(1);
+  });
+
+  it('prefers the own key, then shading for gates, then the old cover group', () => {
+    const order = ['light', 'cover', 'cover_shading', 'cover_gates'];
+    expect(areaGroupOrderIndex(order, 'cover_gates')).toBe(3);
+    expect(areaGroupOrderIndex(['light', 'cover', 'cover_shading'], 'cover_gates')).toBe(2);
+    expect(areaGroupOrderIndex(order, 'cover_openings')).toBe(1);
+  });
+
+  it('falls back to the broad group the settings editor saved', () => {
+    const order = ['lights', 'security', 'covers'];
+    expect(areaGroupOrderIndex(order, 'cover_openings')).toBe(2);
+    expect(areaGroupOrderIndex(order, 'safety')).toBe(1);
+    expect(areaGroupOrderIndex(order, 'light')).toBe(0);
+    expect(areaGroupOrderIndex(order, 'media_player')).toBeUndefined();
+    expect(areaGroupOrderIndex([], 'light')).toBeUndefined();
+  });
+
+  it('reads the entity order of a group from older keys', () => {
+    const groupsOptions = {
+      cover: { order: ['cover.b', 'cover.a'] },
+      cover_shading: { order: ['cover.gate', 'cover.blind'] },
+      input_select: { order: ['input_select.mode'] },
+      cover_openings: { order: [] },
+    };
+    expect(resolveAreaGroupEntityOrder(groupsOptions, 'cover_gates')).toEqual(['cover.gate', 'cover.blind']);
+    expect(resolveAreaGroupEntityOrder(groupsOptions, 'cover_shading')).toEqual(['cover.gate', 'cover.blind']);
+    // An empty saved order does not hide the older one.
+    expect(resolveAreaGroupEntityOrder(groupsOptions, 'cover_openings')).toEqual(['cover.b', 'cover.a']);
+    expect(resolveAreaGroupEntityOrder({ cover: { order: ['cover.b'] } }, 'cover_gates')).toEqual(['cover.b']);
+    expect(resolveAreaGroupEntityOrder(groupsOptions, 'select')).toEqual(['input_select.mode']);
+    expect(resolveAreaGroupEntityOrder(groupsOptions, 'light')).toEqual([]);
+    expect(resolveAreaGroupEntityOrder(undefined, 'light')).toEqual([]);
+  });
+
+  it('moves custom cards of old groups to the group that took over', () => {
+    expect(migrateAreaCardPlacement('domain:cover:2')).toBe('domain:cover_shading:2');
+    expect(migrateAreaCardPlacement('after:cover')).toBe('after:cover_shading');
+    expect(migrateAreaCardPlacement('domain:input_select:0')).toBe('domain:select:0');
+    expect(migrateAreaCardPlacement('domain:alarm_control_panel:1')).toBe('domain:safety:1');
+    expect(migrateAreaCardPlacement('domain:cover_openings:1')).toBe('domain:cover_openings:1');
+    expect(migrateAreaCardPlacement('domain:light:0')).toBe('domain:light:0');
+    expect(migrateAreaCardPlacement('domain:constructor:0')).toBe('domain:constructor:0');
+    expect(migrateAreaCardPlacement('ungrouped:3')).toBe('ungrouped:3');
+    expect(migrateAreaCardPlacement('bottom')).toBe('bottom');
+  });
+});
+
+describe('area cover groups', () => {
+  const states = [
+    entityState('cover.blind', 'open', { device_class: 'blind' }),
+    entityState('cover.awning', 'closed', { device_class: 'awning' }),
+    entityState('cover.plain', 'closed'),
+    entityState('cover.front_door', 'closed', { device_class: 'door' }),
+    entityState('cover.garage', 'open', { device_class: 'garage' }),
+    entityState('binary_sensor.window', 'on', { device_class: 'window' }),
+    entityState('light.ceiling', 'on'),
+  ];
+  const hass = hassWithStates(states);
+  const entities = states.map((state) => ({ entity_id: state.entity_id }));
+  const ids = (list: { entity_id: string }[]) => list.map((entity) => entity.entity_id);
+
+  it('sorts only covers into their groups', () => {
+    const groups = groupAreaCovers(entities, hass.states);
+    expect(ids(groups.cover_shading)).toEqual(['cover.blind', 'cover.awning', 'cover.plain']);
+    expect(ids(groups.cover_openings)).toEqual(['cover.front_door']);
+    expect(ids(groups.cover_gates)).toEqual(['cover.garage']);
+  });
+
+  it('selects the covers an open or close action for a group acts on', () => {
+    expect(ids(selectAreaCovers(entities, hass.states, 'cover_gates'))).toEqual(['cover.garage']);
+    expect(ids(selectAreaCovers(entities, hass.states, 'cover_openings'))).toEqual(['cover.front_door']);
+    expect(ids(selectAreaCovers(entities, hass.states, 'cover_shading'))).toEqual(['cover.blind', 'cover.awning', 'cover.plain']);
+  });
+
+  it('selects every cover without a group', () => {
+    expect(ids(selectAreaCovers(entities, hass.states))).toEqual([
+      'cover.blind',
+      'cover.awning',
+      'cover.plain',
+      'cover.front_door',
+      'cover.garage',
+    ]);
+  });
+
+  it('treats covers without a state as shading', () => {
+    expect(ids(selectAreaCovers([{ entity_id: 'cover.gone' }], {}, 'cover_shading'))).toEqual(['cover.gone']);
   });
 });

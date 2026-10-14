@@ -768,6 +768,13 @@ export const en = {
   'domain.date': 'Dates',
   'domain.time': 'Times',
   'domain.timer': 'Timers',
+  'domain.cover_openings': 'Windows & doors',
+  'domain.cover_shading': 'Shading',
+  'domain.cover_gates': 'Gates',
+  'domain.motion': 'Motion & presence',
+  'domain.safety': 'Safety & alarms',
+  'layout.collapse_group': 'Collapse group',
+  'layout.expand_group': 'Expand group',
 
   'device_class.motion': 'Motion',
   'device_class.moving': 'Motion',

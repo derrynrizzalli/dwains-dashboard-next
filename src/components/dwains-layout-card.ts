@@ -4,6 +4,7 @@ import { classMap } from 'lit/directives/class-map.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { styleMap } from 'lit/directives/style-map.js';
+import { live } from 'lit/directives/live.js';
 import memoizeOne from 'memoize-one';
 
 import type { HassEntity, HomeAssistant } from '../types/home-assistant';
@@ -28,7 +29,19 @@ import { getDeviceClassName, getDomainName } from '../utils/domain-names';
 import { filterHiddenDeviceEntities } from '../utils/device-admission';
 import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
 import { restrictNonAdminDashboardSettings } from '../utils/security';
-import { areaEntityDeviceLabel, sortAreas, stripAreaFromEntityName } from '../utils/area-entities';
+import {
+  areaEntityDeviceLabel,
+  areaGroupOrderIndex,
+  getAreaEntityGroupKey,
+  groupAreaCovers,
+  migrateAreaCardPlacement,
+  resolveAreaGroupEntityOrder,
+  selectAreaCovers,
+  sortAreas,
+  stripAreaFromEntityName,
+  AREA_COVER_GROUPS,
+  type AreaCoverGroup,
+} from '../utils/area-entities';
 import { navigateHomeAssistant } from '../utils/navigation';
 import { syncHassDarkThemeAttribute } from '../utils/theme';
 import { HOME_SECTION_META, normalizeHiddenHomeInformationCards, normalizeHiddenHomeSections, normalizeHomeSectionsOrder } from '../utils/home-sections';
@@ -207,6 +220,8 @@ export class DwainsLayoutCard extends LitElement {
   @state() private _areaHeaderStuck = false;
   @state() private _areaHeaderRevealed = false;
   @state() private _mobileEntityLayout: 'rail' | 'grid' = 'rail';
+  // Collapsed room groups as `${areaId}:${groupKey}`. Kept in memory only.
+  @state() private _collapsedAreaGroups: ReadonlySet<string> = new Set();
   @state() private _mobileHomeAreasLayout: 'rail' | 'grid' = 'rail';
   @state() private _mobileHomeDevicesLayout: 'rail' | 'grid' = 'rail';
   @state() private _mobileHomeFavoritesLayout: 'rail' | 'grid' = 'rail';
@@ -4211,7 +4226,8 @@ export class DwainsLayoutCard extends LitElement {
       ? options.custom_cards
           .map((entry: any, index: number) => ({
             id: String(entry?.id || `generated-${index}`),
-            placement: String(entry?.placement || 'bottom'),
+            // Cards in a group that was split or merged follow its entities.
+            placement: migrateAreaCardPlacement(String(entry?.placement || 'bottom')),
             card: entry?.card,
           }))
           .filter((entry: NormalizedAreaCustomCard) => entry.card && typeof entry.card === 'object')
@@ -4477,14 +4493,23 @@ export class DwainsLayoutCard extends LitElement {
     return active ? this._t('area_header.on_count', { active, total }) : this._t('common.off');
   }
 
+  /** Closed is the resting state of every cover group; the icon shows when something is open. */
+  private _areaCoverTileIcon(groupKey: AreaCoverGroup, isOpen: boolean): string {
+    if (groupKey === 'cover_openings') return isOpen ? 'mdi:door-open' : 'mdi:door-closed';
+    if (groupKey === 'cover_gates') return isOpen ? 'mdi:gate-open' : 'mdi:gate';
+    return isOpen ? 'mdi:blinds-horizontal' : 'mdi:blinds-horizontal-closed';
+  }
+
   private _renderAreaQuickTiles(areaId: string, entities: EntityConfig[]) {
     const lights = entities.filter(e => e.entity_id.startsWith('light.'));
     const switches = entities.filter(e => e.entity_id.startsWith('switch.'));
-    const covers = entities.filter(e => e.entity_id.startsWith('cover.'));
+    // One tile per cover group, for example blinds apart from the garage door.
+    const coverGroups = groupAreaCovers(entities, this.hass.states);
+    const hasCovers = AREA_COVER_GROUPS.some(groupKey => coverGroups[groupKey].length > 0);
     const fans = entities.filter(e => e.entity_id.startsWith('fan.'));
     const climates = entities.filter(e => e.entity_id.startsWith('climate.'));
 
-    if (!lights.length && !switches.length && !covers.length && !fans.length && !climates.length) {
+    if (!lights.length && !switches.length && !hasCovers && !fans.length && !climates.length) {
       return nothing;
     }
 
@@ -4521,7 +4546,47 @@ export class DwainsLayoutCard extends LitElement {
       `;
     };
 
-    const openCovers = this._countActiveEntities(covers, 'cover');
+    const coverTile = (groupKey: AreaCoverGroup, covers: EntityConfig[]) => {
+      if (!covers.length) return nothing;
+      const openCovers = this._countActiveEntities(covers, 'cover');
+      const isOpen = openCovers > 0;
+      const label = this._mobileGroupName(groupKey);
+      const state = this._areaTileState(openCovers, covers.length, 'open');
+      const openLabel = this._t('action.entity_action', { action: this._t('action.open_all'), name: label });
+      const closeLabel = this._t('action.entity_action', { action: this._t('action.close_all'), name: label });
+      return html`
+        <div class="dd-room-tile cover ${groupKey} has-actions ${isOpen ? 'is-on' : ''}">
+          <span class="dd-room-tile-icon">
+            <ha-icon icon=${this._areaCoverTileIcon(groupKey, isOpen)}></ha-icon>
+          </span>
+          <span class="dd-room-tile-copy">
+            <span class="dd-room-tile-label">${label}</span>
+            <span class="dd-room-tile-state">${state}</span>
+          </span>
+          <span class="dd-room-tile-actions">
+            <button
+              class="dd-room-tile-action"
+              type="button"
+              title=${openLabel}
+              aria-label=${openLabel}
+              @click=${() => void this._setAreaCoverState(areaId, true, groupKey)}
+            >
+              <ha-icon icon="mdi:arrow-up"></ha-icon>
+            </button>
+            <button
+              class="dd-room-tile-action"
+              type="button"
+              title=${closeLabel}
+              aria-label=${closeLabel}
+              @click=${() => void this._setAreaCoverState(areaId, false, groupKey)}
+            >
+              <ha-icon icon="mdi:arrow-down"></ha-icon>
+            </button>
+          </span>
+        </div>
+      `;
+    };
+
     const activeClimates = this._countActiveEntities(climates, 'climate');
     const singleClimateState = climates.length === 1 ? this.hass.states[climates[0]!.entity_id] : undefined;
     const currentTemperature = singleClimateState?.attributes?.current_temperature;
@@ -4548,37 +4613,7 @@ export class DwainsLayoutCard extends LitElement {
           ['action.switches_on_summary', 'action.switches_off_summary'],
           () => this._toggleAreaSwitches(areaId)
         ) : nothing}
-        ${covers.length ? html`
-          <div class="dd-room-tile cover has-actions ${openCovers > 0 ? 'is-on' : ''}">
-            <span class="dd-room-tile-icon">
-              <ha-icon icon=${openCovers > 0 ? 'mdi:window-shutter-open' : 'mdi:window-shutter'}></ha-icon>
-            </span>
-            <span class="dd-room-tile-copy">
-              <span class="dd-room-tile-label">${this._t('domain.cover')}</span>
-              <span class="dd-room-tile-state">${this._areaTileState(openCovers, covers.length, 'open')}</span>
-            </span>
-            <span class="dd-room-tile-actions">
-              <button
-                class="dd-room-tile-action"
-                type="button"
-                title=${this._t('action.open_all')}
-                aria-label=${this._t('action.open_all')}
-                @click=${() => void this._setAreaCoverState(areaId, true)}
-              >
-                <ha-icon icon="mdi:arrow-up"></ha-icon>
-              </button>
-              <button
-                class="dd-room-tile-action"
-                type="button"
-                title=${this._t('action.close_all')}
-                aria-label=${this._t('action.close_all')}
-                @click=${() => void this._setAreaCoverState(areaId, false)}
-              >
-                <ha-icon icon="mdi:arrow-down"></ha-icon>
-              </button>
-            </span>
-          </div>
-        ` : nothing}
+        ${AREA_COVER_GROUPS.map(groupKey => coverTile(groupKey, coverGroups[groupKey]))}
         ${fans.length ? toggleTile(
           'fan',
           fans.length,
@@ -4698,17 +4733,34 @@ export class DwainsLayoutCard extends LitElement {
     return html`
       <section class="mobile-entities-section layout-${this._mobileEntityLayout}">
         ${renderedGroups.map((group, groupIndex) => {
-          const hasActions = this._mobileControllableEntities(group.entities).length > 0;
+          const controllableEntities = this._mobileControllableEntities(group.entities);
+          const hasActions = controllableEntities.length > 0;
+          // A master switch shows "2 of 5 on", which already tells how many there are.
+          const showsMasterCount = this._mobileDomainMasterShowsCount(controllableEntities);
           const gridMode = this._mobileEntityLayout === 'grid';
           const renderedEntities = this._isMobile && !this._editMode && !this._renderAllMobileAreaEntities && group.entities.length > MOBILE_INITIAL_ENTITY_CARDS
             ? group.entities.slice(0, MOBILE_INITIAL_ENTITY_CARDS)
             : group.entities;
           const renderedEntityIds = renderedEntities.map(entity => entity.entity_id);
+          // Edit mode keeps every group open, so all card slots stay reachable.
+          const collapsible = !this._editMode;
+          const collapseKey = `${area.area_id}:${group.key}`;
+          const collapsed = collapsible && this._collapsedAreaGroups.has(collapseKey);
+          const railId = `mobile-group-${group.key}`;
+          const titleCopy = html`
+            <span class="mobile-domain-title-copy">
+              <span class="mobile-domain-title-label">${group.name}</span>
+              ${group.entities.length > 0 && !showsMasterCount ? html`
+                <span class="mobile-domain-count">(${this._tp('common.item', group.entities.length)})</span>
+              ` : nothing}
+            </span>
+          `;
 
           return html`
             <div
               class=${classMap({
                 'mobile-domain-group': true,
+                'is-collapsed': collapsed,
                 'group-editing': this._editMode && this._canManageDashboard(),
                 'group-dragging': this._generatedGroupDrag?.areaId === area.area_id &&
                   this._generatedGroupDrag.groupKey === group.key,
@@ -4738,12 +4790,19 @@ export class DwainsLayoutCard extends LitElement {
                           <ha-icon icon=${gridMode ? 'mdi:view-carousel-outline' : 'mdi:view-grid-outline'}></ha-icon>
                         </button>
                       `}
-                  <span class="mobile-domain-title-copy">
-                    <span class="mobile-domain-title-label">${group.name}</span>
-                    ${group.entities.length > 0 ? html`
-                      <span class="mobile-domain-count">(${this._tp('common.item', group.entities.length)})</span>
-                    ` : nothing}
-                  </span>
+                  ${collapsible ? html`
+                    <button
+                      class="mobile-domain-collapse"
+                      type="button"
+                      aria-expanded=${collapsed ? 'false' : 'true'}
+                      aria-controls=${railId}
+                      title=${this._t(collapsed ? 'layout.expand_group' : 'layout.collapse_group')}
+                      @click=${() => this._toggleAreaGroupCollapsed(collapseKey)}
+                    >
+                      ${titleCopy}
+                      <ha-icon class="mobile-domain-collapse-icon" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+                    </button>
+                  ` : titleCopy}
                 </div>
                 <div class="mobile-domain-header-actions">
                   ${this._editMode && this._canManageDashboard() ? html`
@@ -4796,25 +4855,37 @@ export class DwainsLayoutCard extends LitElement {
                       <ha-icon icon="mdi:drag"></ha-icon>
                     </button>
                   ` : nothing}
-                  ${hasActions ? this._renderMobileDomainMaster(group) : nothing}
+                  ${hasActions ? this._renderMobileDomainMaster(group, controllableEntities) : nothing}
                 </div>
 	              </div>
-	              <div class="mobile-entity-rail">
-	                ${this._renderDomainCustomCardSlot(area.area_id, group.key, 0, renderedEntities.length)}
-	                ${repeat(
-	                  renderedEntities,
-	                  entity => entity.entity_id,
-	                  (entity, index) => html`
-                      ${this._renderEditableGeneratedCard(area, entity, group.key, index, renderedEntityIds)}
-                      ${this._renderDomainCustomCardSlot(area.area_id, group.key, index + 1, renderedEntities.length)}
-                    `
-	                )}
+	              <div class="mobile-entity-rail" id=${railId} ?hidden=${collapsed}>
+	                ${collapsed ? nothing : html`
+	                  ${this._renderDomainCustomCardSlot(area.area_id, group.key, 0, renderedEntities.length)}
+	                  ${repeat(
+	                    renderedEntities,
+	                    entity => entity.entity_id,
+	                    (entity, index) => html`
+                        ${this._renderEditableGeneratedCard(area, entity, group.key, index, renderedEntityIds)}
+                        ${this._renderDomainCustomCardSlot(area.area_id, group.key, index + 1, renderedEntities.length)}
+                      `
+	                  )}
+	                `}
 	              </div>
 	            </div>
 	          `;
 	        })}
       </section>
     `;
+  }
+
+  private _toggleAreaGroupCollapsed(collapseKey: string): void {
+    const next = new Set(this._collapsedAreaGroups);
+    if (next.has(collapseKey)) {
+      next.delete(collapseKey);
+    } else {
+      next.add(collapseKey);
+    }
+    this._collapsedAreaGroups = next;
   }
 
   private _renderUngroupedAreaEntities(area: AreaConfig, entities: EntityConfig[]) {
@@ -4881,8 +4952,17 @@ export class DwainsLayoutCard extends LitElement {
     `;
   }
 
-  private _renderMobileDomainMaster(group: MobileEntityGroup) {
-    const entities = this._mobileControllableEntities(group.entities);
+  /** Master switches (not the cover or lock buttons) of groups with more than one entity show a count. */
+  private _mobileDomainMasterShowsCount(controllableEntities: EntityConfig[]): boolean {
+    if (controllableEntities.length < 2) return false;
+    const domain = controllableEntities[0]!.entity_id.split('.')[0] || '';
+    return this._mobileEntityActionKind(domain) === 'toggle';
+  }
+
+  private _renderMobileDomainMaster(
+    group: MobileEntityGroup,
+    entities: EntityConfig[] = this._mobileControllableEntities(group.entities)
+  ) {
     if (!entities.length) return nothing;
 
     const domain = entities[0]!.entity_id.split('.')[0] || group.key;
@@ -4916,10 +4996,13 @@ export class DwainsLayoutCard extends LitElement {
 
     const label = this._mobileDomainMasterLabel(domain, active, activeCount, entities.length);
     const icon = this._mobileDomainMasterIcon(domain, active);
+    const count = this._mobileDomainMasterShowsCount(entities)
+      ? this._t('area_header.on_count', { active: activeCount, total: entities.length })
+      : '';
 
     return html`
       <button
-        class="mobile-domain-master domain-${domain} ${active ? 'active' : ''}"
+        class="mobile-domain-master domain-${domain} ${active ? 'active' : ''} ${count ? 'has-count' : ''}"
         type="button"
         title=${label}
         aria-label=${label}
@@ -4930,6 +5013,7 @@ export class DwainsLayoutCard extends LitElement {
         }}
       >
         <ha-icon icon=${icon}></ha-icon>
+        ${count ? html`<span class="mobile-domain-master-count">${count}</span>` : nothing}
         <span class="mobile-domain-master-track" aria-hidden="true"></span>
       </button>
     `;
@@ -5030,7 +5114,10 @@ export class DwainsLayoutCard extends LitElement {
       if (!grouped[groupKey]) grouped[groupKey] = [];
     });
 
-    const order = ['light', 'switch', 'cover', 'climate', 'todo', 'scene', 'event', 'motion', 'binary_sensor', 'sensor', 'media_player', 'fan', 'lock', 'camera', 'vacuum'];
+    const order = [
+      'light', 'switch', 'cover_shading', 'cover_openings', 'cover_gates', 'cover', 'climate', 'todo', 'scene',
+      'event', 'motion', 'safety', 'binary_sensor', 'sensor', 'media_player', 'fan', 'lock', 'camera', 'vacuum',
+    ];
 
     return Object.entries(grouped)
       .sort(([a], [b]) => {
@@ -5051,38 +5138,23 @@ export class DwainsLayoutCard extends LitElement {
     const configuredOrder = this.config?.areas_options?.[areaId]?.group_order || [];
     if (!configuredOrder.length) return groups;
 
-    const directOrder = new Map(configuredOrder.map((groupKey, index) => [groupKey, index]));
-    const strategyOrder: string[] = [];
-    configuredOrder.forEach((groupKey) => {
-      const strategyGroup = this._strategyGroupForMobileGroupKey(groupKey);
-      if (!strategyOrder.includes(strategyGroup)) strategyOrder.push(strategyGroup);
-    });
-    const projectedOrder = new Map(strategyOrder.map((groupKey, index) => [groupKey, index]));
-    const groupIndex = (groupKey: string): number | undefined => directOrder.get(groupKey) ??
-      projectedOrder.get(this._strategyGroupForMobileGroupKey(groupKey));
-
+    // Saved orders can hold current keys, keys of older versions and the broad
+    // settings groups; areaGroupOrderIndex reads all of them.
     return groups
-      .map((group, fallbackIndex) => ({ group, fallbackIndex }))
+      .map((group, fallbackIndex) => ({
+        group,
+        fallbackIndex,
+        orderIndex: areaGroupOrderIndex(configuredOrder, group.key),
+      }))
       .sort((a, b) => {
-        const aIndex = groupIndex(a.group.key);
-        const bIndex = groupIndex(b.group.key);
-        if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex;
-        if (aIndex !== undefined) return -1;
-        if (bIndex !== undefined) return 1;
+        const aIndex = a.orderIndex;
+        const bIndex = b.orderIndex;
+        if (aIndex !== undefined && bIndex !== undefined && aIndex !== bIndex) return aIndex - bIndex;
+        if (aIndex !== undefined && bIndex === undefined) return -1;
+        if (aIndex === undefined && bIndex !== undefined) return 1;
         return a.fallbackIndex - b.fallbackIndex;
       })
       .map(({ group }) => group);
-  }
-
-  private _strategyGroupForMobileGroupKey(groupKey: string): string {
-    if (groupKey === 'light' || groupKey === 'lights') return 'lights';
-    if (['climate', 'humidifier', 'water_heater', 'fan'].includes(groupKey)) return 'climate';
-    if (groupKey === 'cover' || groupKey === 'covers') return 'covers';
-    if (groupKey === 'media_player' || groupKey === 'media_players') return 'media_players';
-    if (['alarm_control_panel', 'lock', 'camera', 'binary_sensor', 'security'].includes(groupKey)) return 'security';
-    if (groupKey === 'motion') return 'motion';
-    if (['script', 'scene', 'automation', 'todo', 'event', 'actions'].includes(groupKey)) return 'actions';
-    return 'others';
   }
 
   private _sortAreaEntities(areaId: string, entities: EntityConfig[]): EntityConfig[] {
@@ -5103,7 +5175,7 @@ export class DwainsLayoutCard extends LitElement {
         const aMobileGroup = this._mobileEntityTypeKey(a.entity_id);
         const bMobileGroup = this._mobileEntityTypeKey(b.entity_id);
         if (aMobileGroup === bMobileGroup && aMobileGroup) {
-          const mobileGroupOrder = areaOptions?.groups_options?.[aMobileGroup]?.order || [];
+          const mobileGroupOrder = resolveAreaGroupEntityOrder(areaOptions?.groups_options, aMobileGroup);
           const aMobileIndex = mobileGroupOrder.indexOf(a.entity_id);
           const bMobileIndex = mobileGroupOrder.indexOf(b.entity_id);
           if (aMobileIndex !== -1 && bMobileIndex !== -1) return aMobileIndex - bMobileIndex;
@@ -5417,13 +5489,7 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _mobileEntityTypeKey(entityId: string): string | undefined {
-    const domain = entityId.split('.')[0];
-    if (!domain) return undefined;
-    if (domain === 'binary_sensor') {
-      const deviceClass = this.hass.states[entityId]?.attributes?.device_class;
-      return deviceClass === 'motion' ? 'motion' : 'binary_sensor';
-    }
-    return domain;
+    return getAreaEntityGroupKey(entityId, this.hass.states[entityId]) || undefined;
   }
 
   private _mobileGroupName(key: string): string {
@@ -5432,6 +5498,10 @@ export class DwainsLayoutCard extends LitElement {
 
   private _mobileGroupIcon(key: string): string {
     if (key === 'motion') return 'mdi:motion-sensor';
+    if (key === 'safety') return 'mdi:shield-alert-outline';
+    if (key === 'cover_openings') return 'mdi:door-open';
+    if (key === 'cover_shading') return 'mdi:blinds-horizontal';
+    if (key === 'cover_gates') return 'mdi:gate';
     return getDomainIcon(key);
   }
 
@@ -5486,13 +5556,11 @@ export class DwainsLayoutCard extends LitElement {
     const deviceLabel = areaEntityDeviceLabel(name, this._entityDeviceName(entity.entity_id), area.name);
     const active = this._isEntityActiveForUi(state, domain);
     const actionKind = this._mobileEntityActionKind(domain);
-    const hasInlineSelect = this._mobileEntityHasInlineSelect(domain, state);
     const classes = [
       'mobile-entity-card',
       `mobile-entity-${domain}`,
       `action-${actionKind}`,
       active ? 'is-active' : 'is-off',
-      hasInlineSelect ? 'has-inline-select' : '',
       isHiddenAsUnavailable(state) ? 'is-unavailable' : '',
     ].join(' ');
 
@@ -5518,7 +5586,6 @@ export class DwainsLayoutCard extends LitElement {
           <div class="mobile-entity-name">${name}</div>
           <div class="mobile-entity-status">${this._mobileEntityStatusText(state, domain)}</div>
         </div>
-        ${hasInlineSelect ? this._renderMobileEntitySelect(state, domain) : nothing}
       </article>
     `;
   }
@@ -5553,19 +5620,31 @@ export class DwainsLayoutCard extends LitElement {
     return ['select', 'input_select'].includes(domain) && Array.isArray(state?.attributes?.options);
   }
 
+  /**
+   * Selects keep the compact card: the status line shows the current option,
+   * the card opens More info and a chevron button holds an invisible native
+   * select, so the browser's own option list opens from it.
+   */
   private _renderMobileEntitySelect(state: any, domain: string) {
     const options = this._mobileEntitySelectOptions(state);
     const selected = String(state?.state || '');
     const unavailable = ['unavailable', 'unknown'].includes(selected.toLowerCase()) || options.length === 0;
+    const label = this._t('action.entity_action', {
+      action: this._t('common.select_option'),
+      name: this._entityDisplayName(state),
+    });
 
     return html`
-      <label
-        class="mobile-entity-select"
+      <span
+        class="mobile-entity-select-action ${unavailable ? 'is-disabled' : ''}"
+        title=${label}
         @click=${(event: Event) => event.stopPropagation()}
         @keydown=${(event: KeyboardEvent) => event.stopPropagation()}
       >
+        <ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
         <select
-          aria-label=${this._t('common.select_option')}
+          aria-label=${label}
+          .value=${live(selected)}
           ?disabled=${unavailable}
           @change=${(event: Event) => this._handleMobileSelectChange(event, state, domain)}
         >
@@ -5573,8 +5652,7 @@ export class DwainsLayoutCard extends LitElement {
             <option value=${option} ?selected=${option === selected}>${option}</option>
           `)}
         </select>
-        <ha-icon icon="mdi:chevron-down"></ha-icon>
-      </label>
+      </span>
     `;
   }
 
@@ -5597,6 +5675,10 @@ export class DwainsLayoutCard extends LitElement {
     const unavailable = ['unavailable', 'unknown'].includes(String(state?.state || '').toLowerCase());
     const name = this._entityDisplayName(state);
     const labelFor = (action: string) => this._t('action.entity_action', { action, name });
+
+    if (this._mobileEntityHasInlineSelect(domain, state)) {
+      return this._renderMobileEntitySelect(state, domain);
+    }
 
     if (actionKind === 'toggle') {
       return html`
@@ -7263,9 +7345,10 @@ export class DwainsLayoutCard extends LitElement {
     }
   }
 
-  private async _setAreaCoverState(areaId: string, open: boolean) {
+  /** Open or close the covers of an area, or only those of one cover group. */
+  private async _setAreaCoverState(areaId: string, open: boolean, groupKey?: AreaCoverGroup) {
     const entities = this._getFilteredAreaEntities(areaId);
-    const covers = entities.filter(e => e.entity_id.startsWith('cover.'));
+    const covers = selectAreaCovers(entities, this.hass.states, groupKey);
     if (covers.length === 0) return;
 
     const confirmed = await this._confirmMasterActionIfNeeded('cover', open, covers.length, areaId);
