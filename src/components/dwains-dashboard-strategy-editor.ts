@@ -38,7 +38,12 @@ import { countReplacementRules } from "../utils/blueprint-replacements";
 import { persistableConfig } from "../utils/dashboard-config";
 import { isHiddenAsUnavailable } from "../utils/entity-availability";
 import { areaEntityDisplayName, hidesAreaNameInEntityNames } from "../utils/entity-names";
-import { getAreaHiddenEntityIdSet, isConfigEntityInArea, resolveStatusEntityAreaId } from "../utils/entity-lookups";
+import {
+  getAreaHiddenEntityIdSet,
+  getDevicesPageHiddenEntityIdSet,
+  isConfigEntityInArea,
+  resolveStatusEntityAreaId,
+} from "../utils/entity-lookups";
 import { isAreaNowPlayingEnabled } from "../utils/now-playing";
 import { getDeviceClassName, getDomainName } from "../utils/domain-names";
 import { getDeviceClassIcon, getDomainColor, getDomainIcon } from "../utils/icons";
@@ -3025,11 +3030,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderDeviceVisibilityType(type: DeviceVisibilityTypeNode) {
-    const hiddenEntities = this._getDeviceVisibilityHiddenEntities();
+    // The eye shows the choices made on this page; the count also leaves out
+    // the entities of hidden devices.
     const typeHidden = this._getHiddenDeviceTypes().has(type.key);
-    const entitiesVisibility = idsVisibility(type.entityIds, hiddenEntities);
+    const entitiesVisibility = idsVisibility(type.entityIds, this._getDevicesPageHiddenEntityIds());
     const visibility: GroupVisibility = typeHidden ? 'hidden' : entitiesVisibility;
-    const visibleCount = typeHidden ? 0 : type.entityIds.length - countHidden(type.entityIds, hiddenEntities);
+    const visibleCount = typeHidden
+      ? 0
+      : type.entityIds.length - countHidden(type.entityIds, this._getDeviceVisibilityHiddenEntities());
     const expandable = type.areas.length > 0;
     const expanded = expandable && this._expandedDeviceTypes.has(type.key);
 
@@ -3071,9 +3079,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderDeviceVisibilityArea(type: DeviceVisibilityTypeNode, area: DeviceVisibilityAreaNode, typeHidden: boolean) {
-    const hiddenEntities = this._getDeviceVisibilityHiddenEntities();
-    const hiddenCount = countHidden(area.entityIds, hiddenEntities);
-    const visibility = groupVisibility(area.entityIds.length, hiddenCount);
+    const hiddenCount = countHidden(area.entityIds, this._getDeviceVisibilityHiddenEntities());
+    const visibility = idsVisibility(area.entityIds, this._getDevicesPageHiddenEntityIds());
     const hide = hidesOnToggle(visibility);
 
     return html`
@@ -3184,10 +3191,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   /** Entities hidden on the Devices page only. */
   private _getDevicesPageHiddenEntityIds(): ReadonlySet<string> {
-    return new Set(
-      (this._config?.device_admission?.hidden_entities || [])
-        .filter((entityId): entityId is string => typeof entityId === 'string' && entityId.length > 0)
-    );
+    return getDevicesPageHiddenEntityIdSet(this._config);
   }
 
   /** Entities the Devices page leaves out: hidden on that page or part of a hidden device. */
