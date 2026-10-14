@@ -46,38 +46,3 @@ Captured from Dwains Dashboard Next v1.11.0 in Chrome on October 14, 2026. The i
 ### Wall tablet settings
 
 ![Per-browser wall tablet and screensaver settings](screenshots/v1.11.0/desktop/wall-tablet.jpg)
-
-## Earlier screenshots
-
-These captures document an earlier version of Next. Camera previews in this older set use the demo images from `assets/demo-cameras`.
-
-### Desktop
-
-| Light mode | Dark mode |
-| --- | --- |
-| ![Desktop home light](screenshots/light/desktop/home.png) | ![Desktop home dark](screenshots/dark/desktop/home.png) |
-| ![Desktop devices light](screenshots/light/desktop/devices.png) | ![Desktop devices dark](screenshots/dark/desktop/devices.png) |
-| ![Desktop settings light](screenshots/light/desktop/settings.png) | ![Desktop settings dark](screenshots/dark/desktop/settings.png) |
-
-### Mobile
-
-| Light mode | Dark mode |
-| --- | --- |
-| <img src="screenshots/light/mobile/home.png" alt="Mobile home light" width="260"> | <img src="screenshots/dark/mobile/home.png" alt="Mobile home dark" width="260"> |
-| <img src="screenshots/light/mobile/devices.png" alt="Mobile devices light" width="260"> | <img src="screenshots/dark/mobile/devices.png" alt="Mobile devices dark" width="260"> |
-| <img src="screenshots/light/mobile/settings.png" alt="Mobile settings light" width="260"> | <img src="screenshots/dark/mobile/settings.png" alt="Mobile settings dark" width="260"> |
-
-### Area Page
-
-| Light mode | Dark mode |
-| --- | --- |
-| ![Desktop area light](screenshots/light/desktop/area-woonkamer.png) | ![Desktop area dark](screenshots/dark/desktop/area-woonkamer.png) |
-| <img src="screenshots/light/mobile/area-woonkamer.png" alt="Mobile area light" width="260"> | <img src="screenshots/dark/mobile/area-woonkamer.png" alt="Mobile area dark" width="260"> |
-
-### Settings Details
-
-| Page | Desktop | Mobile |
-| --- | --- | --- |
-| Home page | ![Home page settings desktop](screenshots/light/desktop/settings-home-page.png) | <img src="screenshots/light/mobile/settings-home-page.png" alt="Home page settings mobile" width="220"> |
-| Devices page | ![Devices page settings desktop](screenshots/light/desktop/settings-devices-page.png) | <img src="screenshots/light/mobile/settings-devices-page.png" alt="Devices page settings mobile" width="220"> |
-| Areas | ![Areas settings desktop](screenshots/light/desktop/settings-areas.png) | <img src="screenshots/light/mobile/settings-areas.png" alt="Areas settings mobile" width="220"> |
