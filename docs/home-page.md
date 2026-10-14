@@ -22,12 +22,15 @@ When a media player is playing, Home shows a compact **Now playing** bar with th
 - A paused player stays in the bar for 5 minutes after it was paused, so it can be resumed. After that the bar disappears within a minute.
 - Players follow the same visibility rules as the rest of the dashboard: hidden or disabled entities, entities of hidden devices, entities in hidden areas and entities hidden in their area are left out. Players without an area, like a Spotify account, are shown with their own name.
 
-Choose where the bar appears in **Dashboard settings > Header & status > Now playing bar**: Off, Home only (default) or All pages (Home and every room page).
+Now playing is a section of the Home page: move or hide it in **Dashboard settings > Home page** like the other sections. It comes first by default. The room pages show the bar when **Dashboard settings > Areas > Show Now playing on room pages** is on.
+
+Dashboards set up before Now playing became a section keep their choice: the older **Off** setting keeps the Home section hidden until you change the Home sections, and **All pages** keeps the bar on the room pages until you change the room switch.
 
 ## Sections
 
 The home page can show these sections:
 
+- Now playing
 - Areas
 - Cameras
 - House information
@@ -69,7 +72,7 @@ Available Home Assistant `todo.*` entities appear as editable lists. Items can b
 
 ## Favorites
 
-Favorites show pinned or automatically selected useful entities. On mobile, favorites use the same horizontal section behavior as other home sections.
+Favorites show pinned or automatically selected useful entities. On mobile, favorites use the same horizontal section behavior as other home sections. Pick them in **Dashboard settings > Favorites**.
 
 ## Scenes & scripts
 

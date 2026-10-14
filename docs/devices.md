@@ -23,7 +23,7 @@ Common groups include:
 - People
 - Sensors
 
-The visible groups can be changed in Dashboard settings, Devices page.
+The visible groups can be changed in Dashboard settings, Devices page. The same page can hide single entities from the Devices page only, without hiding them in the rooms.
 
 ## Hidden And Unavailable Entities
 
