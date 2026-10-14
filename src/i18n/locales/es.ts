@@ -806,5 +806,9 @@ export const es = {
   'settings.show_area_now_playing_description': "Muestra la barra Reproduciendo ahora bajo el encabezado de la habitación, con los reproductores de todas las habitaciones. La sección de Inicio se activa en los ajustes de la página de inicio.",
   'settings.show_area_favorites': "Mostrar favoritos en las páginas de habitaciones",
   'settings.show_area_favorites_description': "Los favoritos de una habitación aparecen como grupo en la parte superior de su página. El grupo se puede plegar.",
+  'settings.favorites_page_description': "Favoritos fijados y sugeridos, que se muestran en Inicio y en las páginas de habitaciones.",
+  'settings.manage_favorites': "Gestionar favoritos",
+  'settings.favorite_suggestions_on': "Sugerencias activadas",
+  'settings.favorite_suggestions_off': "Sugerencias desactivadas",
 
 } as const satisfies TranslationDictionary;

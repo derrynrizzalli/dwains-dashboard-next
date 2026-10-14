@@ -804,5 +804,9 @@ export const zhHans = {
   'settings.show_area_now_playing_description': "在房间标头下方显示正在播放栏，包含所有房间的播放器。首页上的区段可在首页设置中开启或关闭。",
   'settings.show_area_favorites': "在房间页面显示我的最爱",
   'settings.show_area_favorites_description': "房间的我的最爱会以群组显示在该房间页面顶部。群组可以折叠。",
+  'settings.favorites_page_description': "已固定和建议的我的最爱，显示在首页和房间页面上。",
+  'settings.manage_favorites': "管理我的最爱",
+  'settings.favorite_suggestions_on': "建议已开启",
+  'settings.favorite_suggestions_off': "建议已关闭",
 
 } as const satisfies TranslationDictionary;

@@ -806,5 +806,9 @@ export const fr = {
   'settings.show_area_now_playing_description': "Affiche la barre En cours de lecture sous l'en-tête de la pièce, avec les lecteurs de toutes les pièces. La section de l'accueil s'active dans les réglages de la page d'accueil.",
   'settings.show_area_favorites': "Afficher les favoris sur les pages des pièces",
   'settings.show_area_favorites_description': "Les favoris d'une pièce apparaissent en groupe en haut de sa page. Le groupe peut être replié.",
+  'settings.favorites_page_description': "Favoris épinglés et suggérés, affichés sur l'accueil et sur les pages des pièces.",
+  'settings.manage_favorites': "Gérer les favoris",
+  'settings.favorite_suggestions_on': "Suggestions activées",
+  'settings.favorite_suggestions_off': "Suggestions désactivées",
 
 } as const satisfies TranslationDictionary;

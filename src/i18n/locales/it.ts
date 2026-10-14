@@ -829,4 +829,8 @@ export const it = {
   'settings.show_area_now_playing_description': "Mostra la barra In riproduzione sotto l'intestazione della stanza, con i lettori di tutte le stanze. La sezione della Home si attiva nelle impostazioni della pagina iniziale.",
   'settings.show_area_favorites': "Mostra i preferiti nelle pagine delle stanze",
   'settings.show_area_favorites_description': "I preferiti di una stanza compaiono come gruppo in cima alla sua pagina. Il gruppo si può comprimere.",
+  'settings.favorites_page_description': "Preferiti fissati e suggeriti, mostrati nella Home e nelle pagine delle stanze.",
+  'settings.manage_favorites': "Gestisci preferiti",
+  'settings.favorite_suggestions_on': "Suggerimenti attivi",
+  'settings.favorite_suggestions_off': "Suggerimenti disattivati",
 } as const satisfies TranslationDictionary;

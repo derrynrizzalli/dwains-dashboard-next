@@ -829,4 +829,8 @@ export const ptBR = {
   'settings.show_area_now_playing_description': "Mostra a barra Tocando agora abaixo do cabeçalho do cômodo, com os reprodutores de todos os cômodos. A seção da página inicial é ligada nas configurações da página inicial.",
   'settings.show_area_favorites': "Mostrar favoritos nas páginas dos cômodos",
   'settings.show_area_favorites_description': "Os favoritos de um cômodo aparecem como grupo no topo da página dele. O grupo pode ser recolhido.",
+  'settings.favorites_page_description': "Favoritos fixados e sugeridos, exibidos na página inicial e nas páginas dos cômodos.",
+  'settings.manage_favorites': "Gerenciar favoritos",
+  'settings.favorite_suggestions_on': "Sugestões ativadas",
+  'settings.favorite_suggestions_off': "Sugestões desativadas",
 } as const satisfies TranslationDictionary;

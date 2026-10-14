@@ -806,5 +806,9 @@ export const nl = {
   'settings.show_area_now_playing_description': "Toont de Nu aan het spelen-balk onder de kamerkop, met de spelers van alle kamers. De sectie op Home zet je aan of uit bij de instellingen van de startpagina.",
   'settings.show_area_favorites': "Favorieten tonen op kamerpagina's",
   'settings.show_area_favorites_description': "De favorieten van een kamer staan als groep bovenaan de kamerpagina. De groep kan worden ingeklapt.",
+  'settings.favorites_page_description': "Vastgezette en voorgestelde favorieten, getoond op Home en op de kamerpagina's.",
+  'settings.manage_favorites': "Favorieten beheren",
+  'settings.favorite_suggestions_on': "Suggesties aan",
+  'settings.favorite_suggestions_off': "Suggesties uit",
 
 } as const satisfies TranslationDictionary;

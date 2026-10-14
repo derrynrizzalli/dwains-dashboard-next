@@ -804,5 +804,9 @@ export const zhHant = {
   'settings.show_area_now_playing_description': "在房間標頭下方顯示正在播放列，包含所有房間的播放器。首頁上的區段可在首頁設定中開啟或關閉。",
   'settings.show_area_favorites': "在房間頁面顯示我的最愛",
   'settings.show_area_favorites_description': "房間的我的最愛會以群組顯示在該房間頁面頂部。群組可以收合。",
+  'settings.favorites_page_description': "已釘選和建議的我的最愛，顯示在首頁和房間頁面上。",
+  'settings.manage_favorites': "管理我的最愛",
+  'settings.favorite_suggestions_on': "建議已開啟",
+  'settings.favorite_suggestions_off': "建議已關閉",
 
 } as const satisfies TranslationDictionary;

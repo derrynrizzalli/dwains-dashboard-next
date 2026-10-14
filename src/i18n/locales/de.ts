@@ -806,5 +806,9 @@ export const de = {
   'settings.show_area_now_playing_description': "Zeigt die Leiste Aktuelle Wiedergabe unter der Raum-Kopfzeile, mit den Playern aller Räume. Den Abschnitt auf der Startseite schaltest du in den Einstellungen der Startseite ein oder aus.",
   'settings.show_area_favorites': "Favoriten auf Raumseiten anzeigen",
   'settings.show_area_favorites_description': "Die Favoriten eines Raums erscheinen als Gruppe oben auf seiner Seite. Die Gruppe lässt sich einklappen.",
+  'settings.favorites_page_description': "Angeheftete und vorgeschlagene Favoriten, angezeigt auf der Startseite und auf den Raumseiten.",
+  'settings.manage_favorites': "Favoriten verwalten",
+  'settings.favorite_suggestions_on': "Vorschläge an",
+  'settings.favorite_suggestions_off': "Vorschläge aus",
 
 } as const satisfies TranslationDictionary;

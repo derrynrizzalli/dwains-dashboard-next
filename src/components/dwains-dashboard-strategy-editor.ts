@@ -16,6 +16,7 @@ import {
   mdiPencil,
   mdiPuzzleEditOutline,
   mdiShieldAccount,
+  mdiStarOutline,
   mdiThermometerWater,
   mdiViewDashboardEdit,
 } from "@mdi/js";
@@ -83,6 +84,7 @@ type SettingsPageKey =
   | "devices"
   | "people"
   | "areas"
+  | "favorites"
   | "replacements"
   | "permissions"
   | "support"
@@ -157,6 +159,7 @@ const SETTINGS_ICON_PATHS: Record<string, string> = {
   "mdi:home-edit-outline": mdiHomeEditOutline,
   "mdi:puzzle-edit-outline": mdiPuzzleEditOutline,
   "mdi:shield-account": mdiShieldAccount,
+  "mdi:star-outline": mdiStarOutline,
   "mdi:view-dashboard-edit": mdiViewDashboardEdit,
 };
 
@@ -273,7 +276,11 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _settingsPage: SettingsPageKey = restoreSettingsPage();
 
   @state()
-  private _homeSettingsDetail: 'overview' | 'house_information' | 'climate' | 'outdoor_climate' | 'cameras' | 'custom_cards' | 'favorites' | 'scenes' = 'overview';
+  private _homeSettingsDetail: 'overview' | 'house_information' | 'climate' | 'outdoor_climate' | 'cameras' | 'custom_cards' | 'scenes' = 'overview';
+
+  /** Page that opened the Favorites page with a "Manage favorites" link, for its back button. */
+  @state()
+  private _favoritesReturnPage?: "home" | "areas";
 
   // Dashboard-eigenschappen (naam + sidebar-icoon)
   @state() private _dashboardId?: string;
@@ -577,6 +584,20 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         ],
       },
       {
+        page: "favorites",
+        group: "general",
+        icon: "mdi:star-outline",
+        color: "#f59e0b",
+        title: this._t('favorites.title'),
+        description: this._t('settings.favorites_page_description'),
+        summary: [
+          this._tp('common.favorite', favoriteCount),
+          this._t(this._config?.settings?.show_suggested_favorites === false
+            ? 'settings.favorite_suggestions_off'
+            : 'settings.favorite_suggestions_on'),
+        ],
+      },
+      {
         page: "header",
         group: "general",
         icon: "mdi:card-account-details-star-outline",
@@ -737,15 +758,32 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   private _openSettingsPage(page: Exclude<SettingsPageKey, "overview">): void {
     this._settingsPage = page;
+    this._favoritesReturnPage = undefined;
     rememberSettingsPage(page);
     this._closeInlinePickers();
   }
 
   private _backToSettingsOverview = (): void => {
     this._settingsPage = "overview";
+    this._favoritesReturnPage = undefined;
     rememberSettingsPage("overview");
     this._closeInlinePickers();
   };
+
+  /** "Manage favorites" link: opens the Favorites page, whose back button returns here. */
+  private _openFavoritesFrom(page: "home" | "areas", event?: Event): void {
+    event?.stopPropagation();
+    this._openSettingsPage("favorites");
+    this._favoritesReturnPage = page;
+  }
+
+  private _renderManageFavoritesLink(page: "home" | "areas") {
+    return html`
+      <button class="link manage-favorites-link" type="button" @click=${(event: Event) => this._openFavoritesFrom(page, event)}>
+        ${this._t('settings.manage_favorites')}
+      </button>
+    `;
+  }
 
   private _closeInlinePickers(): void {
     this._showEntityPicker = false;
@@ -796,10 +834,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     if (!item) return this._renderSettingsOverview();
 
     const homeDetail = page === 'home' ? this._homeSettingsDetailHeader() : undefined;
+    const returnPage = page === 'favorites' ? this._favoritesReturnPage : undefined;
+    const returnItem = returnPage
+      ? this._settingsOverviewItems().find((candidate) => candidate.page === returnPage)
+      : undefined;
     const title = homeDetail?.title || item.title;
     const description = homeDetail?.description || item.description;
-    const backLabel = homeDetail?.backLabel || this._t('settings.all_settings');
-    const backAction = homeDetail ? this._backFromHomeSettingsDetail : this._backToSettingsOverview;
+    const backLabel = homeDetail?.backLabel || returnItem?.title || this._t('settings.all_settings');
+    const backAction = homeDetail
+      ? this._backFromHomeSettingsDetail
+      : returnPage
+        ? () => this._openSettingsPage(returnPage)
+        : this._backToSettingsOverview;
 
     return html`
       <div class="editor-container">
@@ -841,6 +887,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         return this._renderPersonsSettingsPanel();
       case "areas":
         return this._renderAreasSettingsPanel();
+      case "favorites":
+        return this._renderFavoritesSettingsPanel();
       case "replacements":
         return this._renderReplacementsSettingsPanel();
       case "permissions":
@@ -986,7 +1034,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     if (section === 'devices') return 'house_information';
     if (section === 'cameras') return 'cameras';
     if (section === 'custom_cards') return 'custom_cards';
-    if (section === 'favorites') return 'favorites';
     if (section === 'scenes') return 'scenes';
     return undefined;
   }
@@ -1046,10 +1093,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       );
     }
 
-    if (this._homeSettingsDetail === 'favorites') {
-      return this._renderFavoritesSettingsPanel();
-    }
-
     if (this._homeSettingsDetail === 'scenes') {
       const meta = HOME_SECTION_META.scenes;
       return this._renderSettingsPanel(
@@ -1093,8 +1136,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _renderFavoritesSettingsPanel() {
     return this._renderSettingsPanel(
       "mdi:star",
-      this._t('home_section.favorites.label'),
-      this._t('settings.favorites_description'),
+      this._t('favorites.title'),
+      this._t('settings.favorites_page_description'),
       html`
         <div class="favorites-section">
           <div class="favorite-suggestions-toggle">
@@ -1359,7 +1402,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                 @change=${this._toggleAreaFavorites}
               ></ha-switch>
             </ha-formfield>
-            <p class="toggle-description">${this._t('settings.show_area_favorites_description')}</p>
+            <p class="toggle-description">
+              ${this._t('settings.show_area_favorites_description')}
+              ${this._renderManageFavoritesLink('areas')}
+            </p>
           </div>
           <div class="hide-unavailable-toggle">
             <ha-formfield .label=${this._t('settings.show_area_now_playing')}>
@@ -2172,13 +2218,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                 this._draggedHomeSection !== section;
 
               const detail = this._homeSectionDetail(section);
+              const isFavorites = section === 'favorites';
+              const hasDetail = Boolean(detail) || isFavorites;
               return html`
                 <div
-                  class="home-section-item ${enabled ? '' : 'disabled'} ${detail ? 'has-detail' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}"
+                  class="home-section-item ${enabled ? '' : 'disabled'} ${hasDetail ? 'has-detail' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}"
                   draggable="true"
                   data-section=${section}
                   data-index=${index}
-                  @click=${() => detail && this._openHomeSectionDetail(section)}
+                  @click=${() => isFavorites ? this._openFavoritesFrom('home') : detail && this._openHomeSectionDetail(section)}
                   @dragstart=${(e: DragEvent) => this._handleHomeSectionDragStart(e, section)}
                   @dragend=${this._handleHomeSectionDragEnd}
                   @dragover=${(e: DragEvent) => this._handleHomeSectionDragOver(e, index)}
@@ -2193,9 +2241,12 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                   </div>
                   <div class="home-section-copy">
                     <div class="home-section-title">${this._t(meta.labelKey)}</div>
-                    <div class="home-section-description">${this._t(meta.descriptionKey)}</div>
+                    <div class="home-section-description">
+                      ${this._t(meta.descriptionKey)}
+                      ${isFavorites ? this._renderManageFavoritesLink('home') : nothing}
+                    </div>
                   </div>
-                  ${detail ? html`<ha-svg-icon class="home-section-detail-chevron" .path=${mdiChevronRight}></ha-svg-icon>` : nothing}
+                  ${hasDetail ? html`<ha-svg-icon class="home-section-detail-chevron" .path=${mdiChevronRight}></ha-svg-icon>` : nothing}
                   <div class="home-section-actions" @click=${(event: Event) => event.stopPropagation()}>
                     <button
                       class="home-section-toggle ${enabled ? 'enabled' : ''}"
@@ -6239,6 +6290,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         cursor: pointer;
         font-size: inherit;
         padding: 0;
+      }
+
+      .manage-favorites-link {
+        display: inline;
+        margin-left: 4px;
+        font-weight: 600;
+        line-height: inherit;
+      }
+
+      .manage-favorites-link:hover,
+      .manage-favorites-link:focus-visible {
+        text-decoration: underline;
       }
 
       ha-icon-button[disabled] {

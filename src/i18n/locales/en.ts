@@ -827,6 +827,10 @@ export const en = {
   'settings.show_area_now_playing_description': "Shows the Now playing bar below the room header, with the players of every room. Turn the Home section on or off in the Home page settings.",
   'settings.show_area_favorites': "Show favorites on room pages",
   'settings.show_area_favorites_description': "The favorites of a room appear as a group at the top of its page. The group can be folded.",
+  'settings.favorites_page_description': "Pinned and suggested favorites, shown on Home and on the room pages.",
+  'settings.manage_favorites': "Manage favorites",
+  'settings.favorite_suggestions_on': "Suggestions on",
+  'settings.favorite_suggestions_off': "Suggestions off",
 
 } as const;
 

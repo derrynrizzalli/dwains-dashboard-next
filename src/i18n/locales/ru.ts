@@ -829,5 +829,9 @@ export const ru = {
   'settings.show_area_now_playing_description': "Показывает панель «Сейчас играет» под заголовком комнаты с плеерами всех комнат. Раздел на главной странице включается в настройках главной страницы.",
   'settings.show_area_favorites': "Показывать избранное на страницах комнат",
   'settings.show_area_favorites_description': "Избранное комнаты показывается группой вверху ее страницы. Группу можно свернуть.",
+  'settings.favorites_page_description': "Закрепленное и предложенное избранное на главной странице и на страницах комнат.",
+  'settings.manage_favorites': "Управлять избранным",
+  'settings.favorite_suggestions_on': "Предложения включены",
+  'settings.favorite_suggestions_off': "Предложения выключены",
 
 } as const satisfies TranslationDictionary;
