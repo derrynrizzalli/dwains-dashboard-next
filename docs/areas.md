@@ -20,7 +20,7 @@ The area header can show:
 - Area name
 - Device count
 - Temperature and humidity when available
-- Quick control tiles for lights, switches, covers, fans and climate
+- Quick control tiles for lights, switches, covers (one per cover group), fans and climate
 - A thermostat when the area has one climate entity
 - A camera button when the area has an available camera
 - A button with the number of hidden unavailable entities
@@ -46,28 +46,34 @@ Areas with several climate entities keep the climate quick control, which opens 
 
 ## Entity Groups
 
-Entities are grouped by type, for example:
+Most entities are grouped by domain, for example Lights, Switches, Climate, Sensors, Scenes and To-do lists. Covers, binary sensors and alarms are grouped by what they do:
 
-- Lights
-- Switches
-- Covers
-- Climate
-- Motion
-- Sensors
-- Scenes
-- Selectors
-- To-do lists
+- **Windows & doors**: covers with the `door` or `window` device class and binary sensors with the `door`, `window` or `opening` device class
+- **Shading**: all other covers, such as blinds, shades, shutters, curtains, awnings, dampers and covers without a device class
+- **Gates**: covers with the `garage` or `gate` device class and binary sensors with the `garage_door` or `gate` device class
+- **Motion & presence**: binary sensors with the `motion`, `moving`, `occupancy` or `presence` device class
+- **Safety & alarms**: binary sensors with the `smoke`, `gas`, `carbon_monoxide`, `moisture`, `safety`, `tamper`, `problem`, `heat` or `cold` device class, and alarm panels
+- **Selectors**: both `select` and `input_select` entities
+- Other binary sensors stay in **Binary sensors**
+
+Tap a group title to collapse or expand its cards. This is remembered until the page is reloaded, and groups are always open in edit mode. On phones the button in front of the title still switches between swipe and grid cards.
+
+When a group with a master switch (lights, switches, fans and toggles) has more than one entity, the switch shows how many are on, for example **2 of 5 on**, in place of the item count next to the title. Cover groups have open all and close all buttons instead.
+
+Select and input select cards show the current option on one line. Tap the card to open the Home Assistant details dialog, or tap the round chevron button to pick another option from the list.
 
 To-do entities use Home Assistant's editable to-do list card, so list items can be viewed, completed and added directly from the area page.
 
+Configurations from before these groups keep working: a saved group order or entity order for the old `cover` group applies to all three cover groups, and custom cards placed in the old cover group now show in Shading. Cards placed with input selects or alarm panels move to Selectors and Safety & alarms.
+
 ## Quick Controls
 
-Each quick control tile shows the group and its state, for example **Lights, 2 of 5 on** or **Covers, Closed**. Supported group actions include:
+Each quick control tile shows the group and its state, for example **Lights, 2 of 5 on** or **Shading, Closed**. Supported group actions include:
 
 - Turn all lights on or off
 - Turn all switches on or off
 - Turn all fans on or off
-- Open or close all covers
+- Open or close all covers of one cover group. Shading, Windows & doors and Gates each get their own tile when the area has covers of that kind, so closing the blinds never opens or closes the garage door.
 - Open a list of all climate entities (when the area has several)
 
 ## Unavailable Entities
