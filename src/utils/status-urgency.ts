@@ -62,20 +62,33 @@ export function statusColor(target: StatusUrgencyTarget, urgent: boolean): strin
   return urgent ? URGENT_STATUS_COLOR : getDomainColor(target.domain, target.deviceClass);
 }
 
+// Order of urgent items: the alarm itself, then safety sensors, then openings
+// and motion. Other items come after them.
+function urgencyRank(item: StatusUrgencyTarget & { urgent?: boolean }): number {
+  if (!item.urgent) return 3;
+  if (item.domain === 'alarm_control_panel') return 0;
+  if (item.domain === 'binary_sensor' && item.deviceClass && ALWAYS_URGENT_DEVICE_CLASSES.has(item.deviceClass)) {
+    return 1;
+  }
+  return 2;
+}
+
+/** Urgent items first (see urgencyRank), the order is kept otherwise. */
+export function sortUrgentFirst<T extends StatusUrgencyTarget & { urgent?: boolean }>(items: readonly T[]): T[] {
+  if (!items.some(item => item.urgent)) return [...items];
+  return items
+    .map((item, index) => ({ item, index, rank: urgencyRank(item) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ item }) => item);
+}
+
 /**
- * Marks the urgent items and moves them to the front; the order is kept
- * otherwise. Returns new objects for the urgent items, the input is not
- * changed.
+ * Marks the urgent items and moves them to the front. Returns new objects for
+ * the urgent items, the input is not changed.
  */
 export function applyStatusUrgency<T extends StatusUrgencyTarget & { urgent?: boolean }>(
   items: readonly T[],
   alarmTriggered: boolean
 ): T[] {
-  const urgent: T[] = [];
-  const rest: T[] = [];
-  items.forEach(item => {
-    if (isUrgentStatus(item, alarmTriggered)) urgent.push({ ...item, urgent: true });
-    else rest.push(item);
-  });
-  return urgent.length ? [...urgent, ...rest] : rest;
+  return sortUrgentFirst(items.map(item => isUrgentStatus(item, alarmTriggered) ? { ...item, urgent: true } : item));
 }

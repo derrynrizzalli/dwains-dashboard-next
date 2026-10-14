@@ -75,9 +75,15 @@ describe('applyStatusUrgency', () => {
     expect(calm.map(chip => chip.name)).toEqual(['Smoke', 'Power', 'Home', 'Lights', 'Windows', 'Motion']);
     expect(calm.filter(chip => chip.urgent).map(chip => chip.name)).toEqual(['Smoke']);
 
+    // Safety sensors stay ahead of openings and motion.
     const triggered = applyStatusUrgency(chips, true);
-    expect(triggered.map(chip => chip.name)).toEqual(['Windows', 'Motion', 'Smoke', 'Power', 'Home', 'Lights']);
+    expect(triggered.map(chip => chip.name)).toEqual(['Smoke', 'Windows', 'Motion', 'Power', 'Home', 'Lights']);
     expect(triggered.filter(chip => chip.urgent)).toHaveLength(3);
+  });
+
+  it('puts the alarm before the other urgent chips', () => {
+    const withAlarm = applyStatusUrgency([...chips, { domain: 'alarm_control_panel', name: 'Alarm' }], true);
+    expect(withAlarm.map(chip => chip.name).slice(0, 4)).toEqual(['Alarm', 'Smoke', 'Windows', 'Motion']);
   });
 
   it('does not change the input', () => {
