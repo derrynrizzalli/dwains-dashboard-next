@@ -812,5 +812,11 @@ export const nl = {
   'settings.favorite_suggestions_off': "Suggesties uit",
   'settings.hide_group': "Groep verbergen",
   'settings.show_group': "Groep tonen",
+  'settings.devices_visibility_description': "Toon of verberg types, kamers en losse entiteiten op de Apparatenpagina. De schakelaar van een apparaat verbergt het hele apparaat in heel Dwains Dashboard.",
+  'settings.device_visible_everywhere': "Zichtbaar in Dwains Dashboard",
+  'settings.device_hidden_everywhere': "Verborgen in heel Dwains Dashboard",
+  'settings.hidden_with_device': "Verborgen met het apparaat",
+  'settings.hidden_entities_count.one': "{count} verborgen entiteit",
+  'settings.hidden_entities_count.other': "{count} verborgen entiteiten",
 
 } as const satisfies TranslationDictionary;

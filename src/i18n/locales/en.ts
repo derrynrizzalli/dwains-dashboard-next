@@ -833,6 +833,12 @@ export const en = {
   'settings.favorite_suggestions_off': "Suggestions off",
   'settings.hide_group': "Hide group",
   'settings.show_group': "Show group",
+  'settings.devices_visibility_description': "Show or hide types, rooms and single entities on the Devices page. The switch of a device hides the whole device in all of Dwains Dashboard.",
+  'settings.device_visible_everywhere': "Shown in Dwains Dashboard",
+  'settings.device_hidden_everywhere': "Hidden in all of Dwains Dashboard",
+  'settings.hidden_with_device': "Hidden with the device",
+  'settings.hidden_entities_count.one': "{count} hidden entity",
+  'settings.hidden_entities_count.other': "{count} hidden entities",
 
 } as const;
 

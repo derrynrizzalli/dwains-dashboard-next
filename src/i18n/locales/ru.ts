@@ -835,5 +835,11 @@ export const ru = {
   'settings.favorite_suggestions_off': "Предложения выключены",
   'settings.hide_group': "Скрыть группу",
   'settings.show_group': "Показать группу",
+  'settings.devices_visibility_description': "Показывайте или скрывайте типы, комнаты и отдельные сущности на странице устройств. Переключатель устройства скрывает все устройство во всем Dwains Dashboard.",
+  'settings.device_visible_everywhere': "Отображается в Dwains Dashboard",
+  'settings.device_hidden_everywhere': "Скрыто во всем Dwains Dashboard",
+  'settings.hidden_with_device': "Скрыто вместе с устройством",
+  'settings.hidden_entities_count.one': "{count} скрытая сущность",
+  'settings.hidden_entities_count.other': "{count} скрытых сущностей",
 
 } as const satisfies TranslationDictionary;

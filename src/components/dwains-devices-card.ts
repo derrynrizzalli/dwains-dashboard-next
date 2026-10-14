@@ -10,7 +10,7 @@ import type {
 import { ddLocale, ddLocalize, ddLocalizePlural } from '../utils/localize';
 import { sortAreas } from '../utils/area-entities';
 import { isHiddenAsUnavailable } from '../utils/entity-availability';
-import { isConfigEntityInArea } from '../utils/entity-lookups';
+import { getDevicesPageHiddenEntityIdSet, isConfigEntityInArea } from '../utils/entity-lookups';
 import { updateStoredDashboardStrategy } from '../utils/dashboard-config-store';
 import { isNonAdminUser } from '../utils/security';
 import { getDomainIcon, getDeviceClassIcon, getDomainColor } from '../utils/icons';
@@ -355,6 +355,12 @@ export class DwainsDevicesCard extends LitElement {
     }
 
     filteredEntities = filterHiddenDeviceEntities(this._hass, this.config, filteredEntities);
+
+    // Entities hidden for this page only in the Devices page settings.
+    const hiddenOnDevicesPage = getDevicesPageHiddenEntityIdSet(this.config);
+    if (hiddenOnDevicesPage.size) {
+      filteredEntities = filteredEntities.filter((entity) => !hiddenOnDevicesPage.has(entity.entity_id));
+    }
 
     return filteredEntities;
   }

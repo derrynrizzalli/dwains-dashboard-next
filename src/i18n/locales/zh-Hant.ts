@@ -810,5 +810,11 @@ export const zhHant = {
   'settings.favorite_suggestions_off': "建議已關閉",
   'settings.hide_group': "隱藏群組",
   'settings.show_group': "顯示群組",
+  'settings.devices_visibility_description': "在裝置頁面顯示或隱藏類型、房間和單一實體。裝置的開關會在整個 Dwains Dashboard 中隱藏整個裝置。",
+  'settings.device_visible_everywhere': "在 Dwains Dashboard 中顯示",
+  'settings.device_hidden_everywhere': "在整個 Dwains Dashboard 中隱藏",
+  'settings.hidden_with_device': "隨裝置一起隱藏",
+  'settings.hidden_entities_count.one': "{count} 個隱藏的實體",
+  'settings.hidden_entities_count.other': "{count} 個隱藏的實體",
 
 } as const satisfies TranslationDictionary;

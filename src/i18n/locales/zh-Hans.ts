@@ -810,5 +810,11 @@ export const zhHans = {
   'settings.favorite_suggestions_off': "建议已关闭",
   'settings.hide_group': "隐藏群组",
   'settings.show_group': "显示群组",
+  'settings.devices_visibility_description': "在设备页面显示或隐藏类型、房间和单个实体。设备的开关会在整个 Dwains Dashboard 中隐藏整个设备。",
+  'settings.device_visible_everywhere': "在 Dwains Dashboard 中显示",
+  'settings.device_hidden_everywhere': "在整个 Dwains Dashboard 中隐藏",
+  'settings.hidden_with_device': "随设备一起隐藏",
+  'settings.hidden_entities_count.one': "{count} 个隐藏的实体",
+  'settings.hidden_entities_count.other': "{count} 个隐藏的实体",
 
 } as const satisfies TranslationDictionary;

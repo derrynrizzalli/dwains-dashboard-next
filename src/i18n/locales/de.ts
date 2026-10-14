@@ -812,5 +812,11 @@ export const de = {
   'settings.favorite_suggestions_off': "Vorschläge aus",
   'settings.hide_group': "Gruppe ausblenden",
   'settings.show_group': "Gruppe anzeigen",
+  'settings.devices_visibility_description': "Typen, Räume und einzelne Entitäten auf der Geräteseite ein- oder ausblenden. Der Schalter eines Geräts blendet das ganze Gerät in ganz Dwains Dashboard aus.",
+  'settings.device_visible_everywhere': "In Dwains Dashboard sichtbar",
+  'settings.device_hidden_everywhere': "In ganz Dwains Dashboard ausgeblendet",
+  'settings.hidden_with_device': "Mit dem Gerät ausgeblendet",
+  'settings.hidden_entities_count.one': "{count} ausgeblendete Entität",
+  'settings.hidden_entities_count.other': "{count} ausgeblendete Entitäten",
 
 } as const satisfies TranslationDictionary;

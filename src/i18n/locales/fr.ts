@@ -812,5 +812,11 @@ export const fr = {
   'settings.favorite_suggestions_off': "Suggestions désactivées",
   'settings.hide_group': "Masquer le groupe",
   'settings.show_group': "Afficher le groupe",
+  'settings.devices_visibility_description': "Affichez ou masquez des types, des pièces et des entités sur la page Appareils. L'interrupteur d'un appareil masque tout l'appareil dans l'ensemble de Dwains Dashboard.",
+  'settings.device_visible_everywhere': "Affiché dans Dwains Dashboard",
+  'settings.device_hidden_everywhere': "Masqué dans tout Dwains Dashboard",
+  'settings.hidden_with_device': "Masqué avec l'appareil",
+  'settings.hidden_entities_count.one': "{count} entité masquée",
+  'settings.hidden_entities_count.other': "{count} entités masquées",
 
 } as const satisfies TranslationDictionary;

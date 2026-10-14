@@ -835,4 +835,10 @@ export const ptBR = {
   'settings.favorite_suggestions_off': "Sugestões desativadas",
   'settings.hide_group': "Ocultar grupo",
   'settings.show_group': "Mostrar grupo",
+  'settings.devices_visibility_description': "Mostre ou oculte tipos, cômodos e entidades avulsas na página de dispositivos. O botão de um dispositivo oculta o dispositivo inteiro em todo o Dwains Dashboard.",
+  'settings.device_visible_everywhere': "Visível no Dwains Dashboard",
+  'settings.device_hidden_everywhere': "Oculto em todo o Dwains Dashboard",
+  'settings.hidden_with_device': "Oculto com o dispositivo",
+  'settings.hidden_entities_count.one': "{count} entidade oculta",
+  'settings.hidden_entities_count.other': "{count} entidades ocultas",
 } as const satisfies TranslationDictionary;

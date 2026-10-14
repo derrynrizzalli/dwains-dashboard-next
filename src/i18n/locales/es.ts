@@ -812,5 +812,11 @@ export const es = {
   'settings.favorite_suggestions_off': "Sugerencias desactivadas",
   'settings.hide_group': "Ocultar grupo",
   'settings.show_group': "Mostrar grupo",
+  'settings.devices_visibility_description': "Muestra u oculta tipos, habitaciones y entidades sueltas en la página de dispositivos. El interruptor de un dispositivo oculta todo el dispositivo en todo Dwains Dashboard.",
+  'settings.device_visible_everywhere': "Visible en Dwains Dashboard",
+  'settings.device_hidden_everywhere': "Oculto en todo Dwains Dashboard",
+  'settings.hidden_with_device': "Oculto con el dispositivo",
+  'settings.hidden_entities_count.one': "{count} entidad oculta",
+  'settings.hidden_entities_count.other': "{count} entidades ocultas",
 
 } as const satisfies TranslationDictionary;

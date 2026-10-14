@@ -183,7 +183,10 @@ export interface BlueprintReplacements {
 }
 
 export interface DeviceAdmission {
+  /** Devices hidden in all of Dwains Dashboard. */
   hidden_devices?: string[];
+  /** Entities hidden on the Devices page only, sorted. */
+  hidden_entities?: string[];
   first_seen_devices?: Record<string, number>;
 }
 
