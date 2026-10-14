@@ -828,5 +828,9 @@ export const es = {
   'settings.reset_devices_visibility': "Volver a mostrar todo",
   'settings.reset_devices_visibility_confirm': "¿Volver a mostrar todos los tipos, dispositivos y entidades?",
   'settings.reset_devices_visibility_message': "Los tipos y entidades ocultos en la página de dispositivos se muestran de nuevo, y los dispositivos ocultos vuelven a mostrarse en todo Dwains Dashboard.",
+  'settings.apply_group_order_all': "Usar este orden de tipos en todas las habitaciones",
+  'settings.apply_group_order_all_confirm': "¿Usar este orden de tipos en todas las habitaciones?",
+  'settings.apply_group_order_all_description': "Cada habitación recibe el orden de los grupos de tipos de esta habitación. Las habitaciones con su propio orden lo pierden.",
+  'settings.apply_group_order_all_done': "Orden de tipos aplicado a todas las habitaciones. Guarda para conservarlo.",
 
 } as const satisfies TranslationDictionary;

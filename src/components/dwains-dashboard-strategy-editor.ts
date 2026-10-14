@@ -282,6 +282,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   @state()
   private _expandedDeviceTypes: ReadonlySet<string> = new Set();
 
+  /** The group order of the room in the settings was changed, so it can be copied to every room. */
+  @state()
+  private _areaGroupOrderChanged = false;
+
   /** Entity groups folded in the room settings. */
   @state()
   private _collapsedAreaGroups: ReadonlySet<string> = new Set();
@@ -2065,6 +2069,17 @@ export class DwainsDashboardStrategyEditor extends LitElement {
           ? this._renderAreaCustomCardPlacement(customCards, 'bottom', this._t('layout.custom_cards_bottom'))
           : nothing}
         <div class="settings-reset-row area-editor-reset-row">
+          ${entityLayout === 'grouped' ? html`
+            <button
+              class="home-layout-reset"
+              type="button"
+              title=${this._t('settings.apply_group_order_all_description')}
+              ?disabled=${!this._areaGroupOrderChanged}
+              @click=${this._applyAreaGroupOrderToAllAreas}
+            >
+              ${this._t('settings.apply_group_order_all')}
+            </button>
+          ` : nothing}
           <button
             class="home-layout-reset"
             type="button"
@@ -4017,7 +4032,36 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         },
       },
     });
+    this._areaGroupOrderChanged = true;
   }
+
+  /** Copies the group order of this room to every room. */
+  private _applyAreaGroupOrderToAllAreas = async (): Promise<void> => {
+    const areaId = this._area;
+    if (!this._config || !areaId || !this._areaGroupOrderChanged) return;
+    const confirmed = await showConfirmDialog(this, {
+      hass: this.hass,
+      title: this._t('settings.apply_group_order_all_confirm'),
+      message: this._t('settings.apply_group_order_all_description'),
+      confirmLabel: this._t('common.apply'),
+    });
+    if (!confirmed || !this._config || this._area !== areaId) return;
+
+    const currentOrder = this._config.areas_options?.[areaId]?.group_order;
+    const order = currentOrder?.length ? [...currentOrder] : [...AREA_STRATEGY_GROUPS];
+    const areasOptions = { ...this._config.areas_options };
+    const areaIds = new Set([
+      ...(this._config.areas || []).map((area) => area.area_id),
+      ...Object.keys(this.hass?.areas || {}),
+    ]);
+    areaIds.forEach((id) => {
+      areasOptions[id] = { ...areasOptions[id], group_order: [...order] };
+    });
+
+    this._fireConfigChanged({ ...this._config, areas_options: areasOptions });
+    this._areaGroupOrderChanged = false;
+    this._showToast(this._t('settings.apply_group_order_all_done'));
+  };
 
   private _handleEntitySectionDragStart(event: DragEvent, group: AreaStrategyGroup): void {
     event.stopPropagation();
@@ -4272,6 +4316,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _editArea(area: string): void {
     this._area = area;
     this._collapsedAreaGroups = new Set();
+    this._areaGroupOrderChanged = false;
   }
 
   private _handleAreaGroupExpandedChanged(event: CustomEvent<{ expanded: boolean }>, group: string): void {

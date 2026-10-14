@@ -826,5 +826,9 @@ export const zhHant = {
   'settings.reset_devices_visibility': "再次顯示全部",
   'settings.reset_devices_visibility_confirm': "要再次顯示所有類型、裝置和實體嗎？",
   'settings.reset_devices_visibility_message': "裝置頁面上隱藏的類型和實體會再次顯示，隱藏的裝置也會在整個 Dwains Dashboard 中再次顯示。",
+  'settings.apply_group_order_all': "將此類型順序用於所有房間",
+  'settings.apply_group_order_all_confirm': "要將此類型順序用於所有房間嗎？",
+  'settings.apply_group_order_all_description': "每個房間都會使用此房間的類型群組順序。已有自訂順序的房間會失去它。",
+  'settings.apply_group_order_all_done': "類型順序已套用到所有房間。請儲存以保留變更。",
 
 } as const satisfies TranslationDictionary;

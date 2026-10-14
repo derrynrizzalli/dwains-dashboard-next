@@ -828,5 +828,9 @@ export const nl = {
   'settings.reset_devices_visibility': "Alles weer tonen",
   'settings.reset_devices_visibility_confirm': "Alle types, apparaten en entiteiten weer tonen?",
   'settings.reset_devices_visibility_message': "Verborgen types en entiteiten op de Apparatenpagina worden weer getoond, en verborgen apparaten worden weer getoond in heel Dwains Dashboard.",
+  'settings.apply_group_order_all': "Deze typevolgorde voor alle kamers gebruiken",
+  'settings.apply_group_order_all_confirm': "Deze typevolgorde voor alle kamers gebruiken?",
+  'settings.apply_group_order_all_description': "Elke kamer krijgt de volgorde van de typegroepen van deze kamer. Kamers met een eigen volgorde raken die kwijt.",
+  'settings.apply_group_order_all_done': "Typevolgorde toegepast op alle kamers. Sla op om te bewaren.",
 
 } as const satisfies TranslationDictionary;

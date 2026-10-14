@@ -828,5 +828,9 @@ export const de = {
   'settings.reset_devices_visibility': "Alles wieder anzeigen",
   'settings.reset_devices_visibility_confirm': "Alle Typen, Geräte und Entitäten wieder anzeigen?",
   'settings.reset_devices_visibility_message': "Ausgeblendete Typen und Entitäten auf der Geräteseite werden wieder angezeigt, und ausgeblendete Geräte erscheinen wieder in ganz Dwains Dashboard.",
+  'settings.apply_group_order_all': "Diese Typreihenfolge für alle Räume verwenden",
+  'settings.apply_group_order_all_confirm': "Diese Typreihenfolge für alle Räume verwenden?",
+  'settings.apply_group_order_all_description': "Jeder Raum erhält die Reihenfolge der Typgruppen dieses Raums. Räume mit eigener Reihenfolge verlieren sie.",
+  'settings.apply_group_order_all_done': "Typreihenfolge auf alle Räume angewendet. Speichern, um sie zu behalten.",
 
 } as const satisfies TranslationDictionary;

@@ -851,5 +851,9 @@ export const ru = {
   'settings.reset_devices_visibility': "Снова показать все",
   'settings.reset_devices_visibility_confirm': "Снова показать все типы, устройства и сущности?",
   'settings.reset_devices_visibility_message': "Скрытые типы и сущности на странице устройств снова будут показаны, а скрытые устройства снова появятся во всем Dwains Dashboard.",
+  'settings.apply_group_order_all': "Использовать этот порядок типов для всех комнат",
+  'settings.apply_group_order_all_confirm': "Использовать этот порядок типов для всех комнат?",
+  'settings.apply_group_order_all_description': "Все комнаты получат порядок групп типов этой комнаты. Комнаты со своим порядком его потеряют.",
+  'settings.apply_group_order_all_done': "Порядок типов применен ко всем комнатам. Сохраните, чтобы оставить его.",
 
 } as const satisfies TranslationDictionary;

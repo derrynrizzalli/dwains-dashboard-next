@@ -826,5 +826,9 @@ export const zhHans = {
   'settings.reset_devices_visibility': "再次显示全部",
   'settings.reset_devices_visibility_confirm': "要再次显示所有类型、设备和实体吗？",
   'settings.reset_devices_visibility_message': "设备页面上隐藏的类型和实体会再次显示，隐藏的设备也会在整个 Dwains Dashboard 中再次显示。",
+  'settings.apply_group_order_all': "将此类型顺序用于所有房间",
+  'settings.apply_group_order_all_confirm': "要将此类型顺序用于所有房间吗？",
+  'settings.apply_group_order_all_description': "每个房间都会使用此房间的类型群组顺序。已有自定义顺序的房间会失去它。",
+  'settings.apply_group_order_all_done': "类型顺序已应用到所有房间。请保存以保留更改。",
 
 } as const satisfies TranslationDictionary;

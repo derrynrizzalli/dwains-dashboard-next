@@ -828,5 +828,9 @@ export const fr = {
   'settings.reset_devices_visibility': "Tout afficher à nouveau",
   'settings.reset_devices_visibility_confirm': "Afficher à nouveau tous les types, appareils et entités ?",
   'settings.reset_devices_visibility_message': "Les types et entités masqués sur la page Appareils réapparaissent, et les appareils masqués réapparaissent dans tout Dwains Dashboard.",
+  'settings.apply_group_order_all': "Utiliser cet ordre des types pour toutes les pièces",
+  'settings.apply_group_order_all_confirm': "Utiliser cet ordre des types pour toutes les pièces ?",
+  'settings.apply_group_order_all_description': "Chaque pièce reçoit l'ordre des groupes de types de cette pièce. Les pièces qui avaient leur propre ordre le perdent.",
+  'settings.apply_group_order_all_done': "Ordre des types appliqué à toutes les pièces. Enregistrez pour le conserver.",
 
 } as const satisfies TranslationDictionary;

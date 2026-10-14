@@ -849,6 +849,10 @@ export const en = {
   'settings.reset_devices_visibility': "Show everything again",
   'settings.reset_devices_visibility_confirm': "Show every type, device and entity again?",
   'settings.reset_devices_visibility_message': "Hidden types and entities on the Devices page are shown again, and hidden devices are shown again in all of Dwains Dashboard.",
+  'settings.apply_group_order_all': "Use this type order for all rooms",
+  'settings.apply_group_order_all_confirm': "Use this type order for all rooms?",
+  'settings.apply_group_order_all_description': "Every room gets the order of the type groups of this room. Rooms with their own order lose it.",
+  'settings.apply_group_order_all_done': "Type order applied to all rooms. Save to keep it.",
 
 } as const;
 
