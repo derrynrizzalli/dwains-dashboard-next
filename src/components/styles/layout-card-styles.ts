@@ -3138,6 +3138,14 @@ export const layoutCardStyles = css`
       --mdc-icon-size: 16px;
     }
 
+    .mobile-domain-master-count {
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
     .mobile-domain-master-track {
       position: relative;
       width: 26px;

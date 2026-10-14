@@ -4728,7 +4728,10 @@ export class DwainsLayoutCard extends LitElement {
     return html`
       <section class="mobile-entities-section layout-${this._mobileEntityLayout}">
         ${renderedGroups.map((group, groupIndex) => {
-          const hasActions = this._mobileControllableEntities(group.entities).length > 0;
+          const controllableEntities = this._mobileControllableEntities(group.entities);
+          const hasActions = controllableEntities.length > 0;
+          // A master switch shows "2 of 5 on", which already tells how many there are.
+          const showsMasterCount = this._mobileDomainMasterShowsCount(controllableEntities);
           const gridMode = this._mobileEntityLayout === 'grid';
           const renderedEntities = this._isMobile && !this._editMode && !this._renderAllMobileAreaEntities && group.entities.length > MOBILE_INITIAL_ENTITY_CARDS
             ? group.entities.slice(0, MOBILE_INITIAL_ENTITY_CARDS)
@@ -4770,7 +4773,7 @@ export class DwainsLayoutCard extends LitElement {
                       `}
                   <span class="mobile-domain-title-copy">
                     <span class="mobile-domain-title-label">${group.name}</span>
-                    ${group.entities.length > 0 ? html`
+                    ${group.entities.length > 0 && !showsMasterCount ? html`
                       <span class="mobile-domain-count">(${this._tp('common.item', group.entities.length)})</span>
                     ` : nothing}
                   </span>
@@ -4826,7 +4829,7 @@ export class DwainsLayoutCard extends LitElement {
                       <ha-icon icon="mdi:drag"></ha-icon>
                     </button>
                   ` : nothing}
-                  ${hasActions ? this._renderMobileDomainMaster(group) : nothing}
+                  ${hasActions ? this._renderMobileDomainMaster(group, controllableEntities) : nothing}
                 </div>
 	              </div>
 	              <div class="mobile-entity-rail">
@@ -4911,8 +4914,17 @@ export class DwainsLayoutCard extends LitElement {
     `;
   }
 
-  private _renderMobileDomainMaster(group: MobileEntityGroup) {
-    const entities = this._mobileControllableEntities(group.entities);
+  /** Master switches (not the cover or lock buttons) of groups with more than one entity show a count. */
+  private _mobileDomainMasterShowsCount(controllableEntities: EntityConfig[]): boolean {
+    if (controllableEntities.length < 2) return false;
+    const domain = controllableEntities[0]!.entity_id.split('.')[0] || '';
+    return this._mobileEntityActionKind(domain) === 'toggle';
+  }
+
+  private _renderMobileDomainMaster(
+    group: MobileEntityGroup,
+    entities: EntityConfig[] = this._mobileControllableEntities(group.entities)
+  ) {
     if (!entities.length) return nothing;
 
     const domain = entities[0]!.entity_id.split('.')[0] || group.key;
@@ -4946,10 +4958,13 @@ export class DwainsLayoutCard extends LitElement {
 
     const label = this._mobileDomainMasterLabel(domain, active, activeCount, entities.length);
     const icon = this._mobileDomainMasterIcon(domain, active);
+    const count = this._mobileDomainMasterShowsCount(entities)
+      ? this._t('area_header.on_count', { active: activeCount, total: entities.length })
+      : '';
 
     return html`
       <button
-        class="mobile-domain-master domain-${domain} ${active ? 'active' : ''}"
+        class="mobile-domain-master domain-${domain} ${active ? 'active' : ''} ${count ? 'has-count' : ''}"
         type="button"
         title=${label}
         aria-label=${label}
@@ -4960,6 +4975,7 @@ export class DwainsLayoutCard extends LitElement {
         }}
       >
         <ha-icon icon=${icon}></ha-icon>
+        ${count ? html`<span class="mobile-domain-master-count">${count}</span>` : nothing}
         <span class="mobile-domain-master-track" aria-hidden="true"></span>
       </button>
     `;
