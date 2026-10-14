@@ -479,7 +479,7 @@ export const it = {
   'replacement.entity_hint': 'Entità e nome vengono compilati automaticamente per ogni entità visualizzata.',
   'replacement.applies_to': 'Verrà applicato alle entità {domain} in entrambe le viste.',
   'replacement.views_title': 'Vista stanza + vista Dispositivi',
-  'replacement.views_description': 'Le sostituzioni per dominio vengono applicate alle schede entità standard in entrambe le viste, come in DD3.',
+  'replacement.views_description': 'Le sostituzioni si applicano alle schede entità standard corrispondenti nelle viste Stanza e Dispositivi.',
   'replacement.target': 'Dominio · {domain}',
   'replacement.applies_hint': 'Si applica alle entità corrispondenti sia nella vista stanze sia nella vista dispositivi.',
   'replacement.search': 'Cerca blueprint per schede sostitutive',

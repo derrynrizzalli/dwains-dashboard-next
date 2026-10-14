@@ -462,7 +462,7 @@ export const zhHans = {
   'replacement.entity_hint': '为每个呈现的实体自动填充实体和名称。',
   'replacement.applies_to': '将套用到两个查看中的 {domain} 实体。',
   'replacement.views_title': '区域查看 + 设备查看',
-  'replacement.views_description': '网域取代会套用到两个查看中的标准实体卡片,如同 DD3。',
+  'replacement.views_description': '替换会应用到区域和设备视图中匹配的标准实体卡片。',
   'replacement.target': '域 · {domain}',
   'replacement.applies_hint': '套用到区域与设备查看中符合的实体。',
   'replacement.search': '搜索取代卡片蓝图',

@@ -462,7 +462,7 @@ export const nl = {
   'replacement.entity_hint': 'Entiteit en naam worden automatisch ingevuld voor elke weergegeven entiteit.',
   'replacement.applies_to': 'Wordt in beide weergaven toegepast op {domain}-entiteiten.',
   'replacement.views_title': 'Areaweergave + apparatenweergave',
-  'replacement.views_description': 'Domeinvervangingen worden, net als in DD3, in beide weergaven op standaard entiteitskaarten toegepast.',
+  'replacement.views_description': 'Vervangingen gelden voor passende standaard entiteitskaarten in ruimte- en apparatenweergaven.',
   'replacement.target': 'Domein · {domain}',
   'replacement.applies_hint': 'Geldt voor overeenkomende entiteiten in zowel area- als apparatenweergaven.',
   'replacement.search': 'Zoek replace-card-blueprints',

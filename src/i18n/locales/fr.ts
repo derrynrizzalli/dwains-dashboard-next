@@ -462,7 +462,7 @@ export const fr = {
   'replacement.entity_hint': 'L\'entité et le nom sont renseignés automatiquement pour chaque entité rendue.',
   'replacement.applies_to': 'Sera appliqué aux entités {domain} dans les deux vues.',
   'replacement.views_title': 'Vue des pièces + vue des appareils',
-  'replacement.views_description': 'Les remplacements de domaines sont appliqués aux cartes d\'entité standard dans les deux vues, comme dans DD3.',
+  'replacement.views_description': 'Les remplacements s\'appliquent aux cartes d\'entité standard correspondantes dans les vues Pièces et Appareils.',
   'replacement.target': 'Domaine · {domain}',
   'replacement.applies_hint': 'S\'applique aux entités correspondantes dans les vues des pièces et des appareils.',
   'replacement.search': 'Rechercher des blueprints replace-card',

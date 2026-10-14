@@ -462,7 +462,7 @@ export const es = {
   'replacement.entity_hint': 'La entidad y el nombre se completan automáticamente para cada entidad representada.',
   'replacement.applies_to': 'Se aplicará a las entidades {domain} en ambas vistas.',
   'replacement.views_title': 'Vista de áreas + vista de dispositivos',
-  'replacement.views_description': 'Los reemplazos de dominio se aplican a las tarjetas de entidad estándar en ambas vistas, como en DD3.',
+  'replacement.views_description': 'Los reemplazos se aplican a las tarjetas de entidad estándar correspondientes en las vistas de áreas y dispositivos.',
   'replacement.target': 'Dominio · {domain}',
   'replacement.applies_hint': 'Se aplica a entidades coincidentes en las vistas de áreas y dispositivos.',
   'replacement.search': 'Buscar blueprints replace-card',

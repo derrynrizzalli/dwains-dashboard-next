@@ -479,7 +479,7 @@ export const ptBR = {
   'replacement.entity_hint': 'A entidade e o nome são preenchidos automaticamente para cada entidade renderizada.',
   'replacement.applies_to': 'Será aplicado às entidades de {domain} nas duas visualizações.',
   'replacement.views_title': 'Visualização de área + visualização de dispositivos',
-  'replacement.views_description': 'As substituições por domínio são aplicadas aos cartões de entidade padrão nas duas visualizações, como no DD3.',
+  'replacement.views_description': 'As substituições são aplicadas aos cartões de entidade padrão correspondentes nas visualizações Cômodo e Dispositivos.',
   'replacement.target': 'Domínio · {domain}',
   'replacement.applies_hint': 'Aplica-se às entidades correspondentes nas visualizações de área e de dispositivos.',
   'replacement.search': 'Pesquisar blueprints de replace-card',

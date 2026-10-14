@@ -462,7 +462,7 @@ export const de = {
   'replacement.entity_hint': 'Entität und Name werden für jede gerenderte Entität automatisch ausgefüllt.',
   'replacement.applies_to': 'Wird in beiden Ansichten auf {domain}-Entitäten angewendet.',
   'replacement.views_title': 'Bereichsansicht + Geräteansicht',
-  'replacement.views_description': 'Domain-Ersetzungen werden wie in DD3 in beiden Ansichten auf Standard-Entitätskarten angewendet.',
+  'replacement.views_description': 'Ersetzungen gelten für passende Standard-Entitätskarten in der Bereichs- und Geräteansicht.',
   'replacement.target': 'Domain · {domain}',
   'replacement.applies_hint': 'Gilt für passende Entitäten in der Bereichs- und Geräteansicht.',
   'replacement.search': 'Replace-Card-Blueprints suchen',

@@ -477,7 +477,7 @@ export const en = {
   'replacement.entity_hint': 'Entity and name are filled automatically for each rendered entity.',
   'replacement.applies_to': 'Will be applied to {domain} entities in both views.',
   'replacement.views_title': 'Area view + Devices view',
-  'replacement.views_description': 'Domain replacements are applied to standard entity cards in both views, like DD3.',
+  'replacement.views_description': 'Replacements apply to matching standard entity cards in Area and Devices views.',
   'replacement.target': 'Domain · {domain}',
   'replacement.applies_hint': 'Applies to matching entities in both area and devices views.',
   'replacement.search': 'Search replace-card blueprints',

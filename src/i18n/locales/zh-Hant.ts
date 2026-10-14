@@ -462,7 +462,7 @@ export const zhHant = {
   'replacement.entity_hint': '為每個呈現的實體自動填入實體和名稱。',
   'replacement.applies_to': '將套用到兩個檢視中的 {domain} 實體。',
   'replacement.views_title': '區域檢視 + 裝置檢視',
-  'replacement.views_description': '網域取代會套用到兩個檢視中的標準實體卡片,如同 DD3。',
+  'replacement.views_description': '取代會套用到區域和裝置檢視中相符的標準實體卡片。',
   'replacement.target': '網域 · {domain}',
   'replacement.applies_hint': '套用到區域與裝置檢視中符合的實體。',
   'replacement.search': '搜尋取代卡片藍圖',
