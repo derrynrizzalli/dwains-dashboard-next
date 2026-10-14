@@ -26,6 +26,7 @@ export const layoutCardStyles = css`
     .mobile-layout-toggle,
     .mobile-entity-card,
     .mobile-entity-action,
+    .mobile-entity-select-action,
     .mobile-cover-action,
     .mobile-entity-toggle,
     .dd-add-card,
@@ -3635,66 +3636,66 @@ export const layoutCardStyles = css`
         min-width: 0;
       }
 
-      .mobile-entity-card.has-inline-select {
-        min-height: 170px;
-        justify-content: flex-start;
-        gap: 10px;
-      }
-
-      .mobile-entity-card.has-inline-select .mobile-entity-content {
-        margin-top: auto;
-      }
-
-      .mobile-entity-card.has-inline-select .mobile-entity-status {
-        display: none;
-      }
-
-      .mobile-entity-select {
+      /* Select cards: a round chevron button over an invisible native select. */
+      .mobile-entity-select-action {
         position: relative;
-        display: block;
-        width: 100%;
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        color: color-mix(in srgb, var(--entity-color) 72%, var(--primary-text-color));
+        background: color-mix(in srgb, var(--entity-color) 10%, var(--secondary-background-color));
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--entity-color) 16%, transparent);
+        transition:
+          background-color 0.18s ease,
+          transform 0.18s ease;
       }
 
-      .mobile-entity-select select {
+      .mobile-entity-select-action:hover {
+        background: color-mix(in srgb, var(--entity-color) 16%, var(--secondary-background-color));
+      }
+
+      .mobile-entity-select-action:active {
+        transform: scale(0.94);
+      }
+
+      .mobile-entity-select-action:has(select:focus-visible) {
+        outline: 2px solid var(--entity-color);
+        outline-offset: 2px;
+      }
+
+      .mobile-entity-select-action.is-disabled {
+        opacity: 0.36;
+      }
+
+      .mobile-entity-select-action ha-icon {
+        pointer-events: none;
+        --mdc-icon-size: 20px;
+      }
+
+      .mobile-entity-select-action select {
+        position: absolute;
+        inset: 0;
         width: 100%;
-        height: 34px;
-        padding: 0 34px 0 12px;
+        height: 100%;
+        margin: 0;
+        padding: 0;
         border: 0;
-        border-radius: 999px;
-        outline: none;
+        border-radius: inherit;
+        opacity: 0;
         appearance: none;
         -webkit-appearance: none;
-        color: var(--primary-text-color);
-        background: color-mix(in srgb, var(--entity-color) 10%, var(--secondary-background-color));
+        /* 16px keeps iOS from zooming in when the list opens. */
         font: inherit;
-        font-size: 12px;
-        font-weight: 850;
-        line-height: 34px;
+        font-size: 16px;
         cursor: pointer;
-        box-shadow:
-          inset 0 0 0 1px color-mix(in srgb, var(--entity-color) 16%, transparent),
-          0 8px 18px rgba(15, 23, 42, 0.06);
       }
 
-      .mobile-entity-select select:focus {
-        box-shadow:
-          inset 0 0 0 2px color-mix(in srgb, var(--entity-color) 72%, transparent),
-          0 10px 22px color-mix(in srgb, var(--entity-color) 14%, transparent);
-      }
-
-      .mobile-entity-select select:disabled {
-        opacity: 0.55;
+      .mobile-entity-select-action select:disabled {
         cursor: not-allowed;
-      }
-
-      .mobile-entity-select ha-icon {
-        position: absolute;
-        top: 50%;
-        right: 10px;
-        transform: translateY(-50%);
-        color: color-mix(in srgb, var(--entity-color) 72%, var(--primary-text-color));
-        pointer-events: none;
-        --mdc-icon-size: 18px;
       }
 
     @media (min-width: 769px) {
@@ -3765,10 +3766,6 @@ export const layoutCardStyles = css`
         box-shadow:
           0 16px 32px rgba(15, 23, 42, 0.08),
           inset 0 0 0 1px rgba(15, 23, 42, 0.045);
-      }
-
-      .area-view .mobile-entity-card.has-inline-select {
-        min-height: 178px;
       }
 
       .area-view .mobile-entity-icon,
@@ -7259,6 +7256,11 @@ export const layoutCardStyles = css`
       .mobile-domain-master,
       .mobile-domain-master-actions {
         min-height: 40px;
+      }
+
+      .mobile-entity-select-action {
+        width: 40px;
+        height: 40px;
       }
 
       /* Three 40px cover buttons do not fit next to the entity icon, so the

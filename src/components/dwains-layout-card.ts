@@ -4,6 +4,7 @@ import { classMap } from 'lit/directives/class-map.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { styleMap } from 'lit/directives/style-map.js';
+import { live } from 'lit/directives/live.js';
 import memoizeOne from 'memoize-one';
 
 import type { HassEntity, HomeAssistant } from '../types/home-assistant';
@@ -5553,13 +5554,11 @@ export class DwainsLayoutCard extends LitElement {
     const deviceLabel = areaEntityDeviceLabel(name, this._entityDeviceName(entity.entity_id), area.name);
     const active = this._isEntityActiveForUi(state, domain);
     const actionKind = this._mobileEntityActionKind(domain);
-    const hasInlineSelect = this._mobileEntityHasInlineSelect(domain, state);
     const classes = [
       'mobile-entity-card',
       `mobile-entity-${domain}`,
       `action-${actionKind}`,
       active ? 'is-active' : 'is-off',
-      hasInlineSelect ? 'has-inline-select' : '',
       isHiddenAsUnavailable(state) ? 'is-unavailable' : '',
     ].join(' ');
 
@@ -5585,7 +5584,6 @@ export class DwainsLayoutCard extends LitElement {
           <div class="mobile-entity-name">${name}</div>
           <div class="mobile-entity-status">${this._mobileEntityStatusText(state, domain)}</div>
         </div>
-        ${hasInlineSelect ? this._renderMobileEntitySelect(state, domain) : nothing}
       </article>
     `;
   }
@@ -5620,19 +5618,31 @@ export class DwainsLayoutCard extends LitElement {
     return ['select', 'input_select'].includes(domain) && Array.isArray(state?.attributes?.options);
   }
 
+  /**
+   * Selects keep the compact card: the status line shows the current option,
+   * the card opens More info and a chevron button holds an invisible native
+   * select, so the browser's own option list opens from it.
+   */
   private _renderMobileEntitySelect(state: any, domain: string) {
     const options = this._mobileEntitySelectOptions(state);
     const selected = String(state?.state || '');
     const unavailable = ['unavailable', 'unknown'].includes(selected.toLowerCase()) || options.length === 0;
+    const label = this._t('action.entity_action', {
+      action: this._t('common.select_option'),
+      name: this._entityDisplayName(state),
+    });
 
     return html`
-      <label
-        class="mobile-entity-select"
+      <span
+        class="mobile-entity-select-action ${unavailable ? 'is-disabled' : ''}"
+        title=${label}
         @click=${(event: Event) => event.stopPropagation()}
         @keydown=${(event: KeyboardEvent) => event.stopPropagation()}
       >
+        <ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
         <select
-          aria-label=${this._t('common.select_option')}
+          aria-label=${label}
+          .value=${live(selected)}
           ?disabled=${unavailable}
           @change=${(event: Event) => this._handleMobileSelectChange(event, state, domain)}
         >
@@ -5640,8 +5650,7 @@ export class DwainsLayoutCard extends LitElement {
             <option value=${option} ?selected=${option === selected}>${option}</option>
           `)}
         </select>
-        <ha-icon icon="mdi:chevron-down"></ha-icon>
-      </label>
+      </span>
     `;
   }
 
@@ -5664,6 +5673,10 @@ export class DwainsLayoutCard extends LitElement {
     const unavailable = ['unavailable', 'unknown'].includes(String(state?.state || '').toLowerCase());
     const name = this._entityDisplayName(state);
     const labelFor = (action: string) => this._t('action.entity_action', { action, name });
+
+    if (this._mobileEntityHasInlineSelect(domain, state)) {
+      return this._renderMobileEntitySelect(state, domain);
+    }
 
     if (actionKind === 'toggle') {
       return html`
