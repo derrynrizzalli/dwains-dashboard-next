@@ -1,5 +1,5 @@
 import type { HassEntity, HomeAssistant } from '../types/home-assistant';
-import type { DwainsDashboardConfig } from '../types/strategy';
+import type { DwainsDashboardConfig, DwainsDashboardSettings } from '../types/strategy';
 import { isEntityFromHiddenDevice } from './device-admission';
 import {
   getAreaConfigMap,
@@ -11,11 +11,12 @@ import {
 import { getEntityRegistry } from './entity-registry';
 import { isRegistryEntryVisible } from './entity-visibility';
 import { shouldSkipGroupEntity } from './header-status-domains';
+import { resolveHiddenHomeSections } from './home-sections';
 
 // Pure helpers for the "Now playing" bar: which media players it shows, in
 // which order, and which buttons a player supports.
 
-/** Where the bar is shown: nowhere, on Home, or on Home and the room pages. */
+/** Older setting for where the bar is shown: nowhere, on Home, or on Home and the room pages. */
 export type NowPlayingMode = 'off' | 'home' | 'all';
 
 /** Bits of `supported_features` (MediaPlayerEntityFeature in Home Assistant). */
@@ -52,11 +53,22 @@ export function normalizeNowPlayingMode(value: unknown): NowPlayingMode {
   return value === 'off' || value === 'all' ? value : 'home';
 }
 
-/** Whether the bar is shown on this view for the given setting. */
-export function isNowPlayingShownOn(mode: NowPlayingMode, view: string | null | undefined): boolean {
-  if (mode === 'off') return false;
-  if (view === 'home') return true;
-  return mode === 'all' && view === 'area';
+type NowPlayingSettings = Pick<
+  DwainsDashboardSettings,
+  'home_sections_order' | 'home_sections_hidden' | 'now_playing_bar' | 'show_area_now_playing'
+>;
+
+/** Whether the room pages show the bar: their own switch, else the older setting. */
+export function isAreaNowPlayingEnabled(settings?: NowPlayingSettings | null): boolean {
+  if (typeof settings?.show_area_now_playing === 'boolean') return settings.show_area_now_playing;
+  return normalizeNowPlayingMode(settings?.now_playing_bar) === 'all';
+}
+
+/** Whether the bar is shown on this view: Home follows its section, the room pages their switch. */
+export function isNowPlayingShownOn(settings: NowPlayingSettings | null | undefined, view: string | null | undefined): boolean {
+  if (view === 'home') return !resolveHiddenHomeSections(settings).includes('now_playing');
+  if (view === 'area') return isAreaNowPlayingEnabled(settings);
+  return false;
 }
 
 export function isPlayingState(state: string | null | undefined): boolean {

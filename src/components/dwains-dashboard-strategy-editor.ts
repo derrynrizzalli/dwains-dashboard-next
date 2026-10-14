@@ -16,10 +16,12 @@ import {
   mdiPencil,
   mdiPuzzleEditOutline,
   mdiShieldAccount,
+  mdiStarOutline,
   mdiThermometerWater,
   mdiViewDashboardEdit,
 } from "@mdi/js";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
+import memoizeOne from "memoize-one";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import type { HomeAssistant } from "../types/home-assistant";
@@ -36,8 +38,14 @@ import {
 import { countReplacementRules, domainReplacementEntries, setDomainReplacement } from "../utils/blueprint-replacements";
 import { persistableConfig } from "../utils/dashboard-config";
 import { isHiddenAsUnavailable } from "../utils/entity-availability";
-import { isConfigEntityInArea, resolveStatusEntityAreaId } from "../utils/entity-lookups";
-import { normalizeNowPlayingMode, type NowPlayingMode } from "../utils/now-playing";
+import { areaEntityDisplayName, hidesAreaNameInEntityNames } from "../utils/entity-names";
+import {
+  getAreaHiddenEntityIdSet,
+  getDevicesPageHiddenEntityIdSet,
+  isConfigEntityInArea,
+  resolveStatusEntityAreaId,
+} from "../utils/entity-lookups";
+import { isAreaNowPlayingEnabled } from "../utils/now-playing";
 import { getDeviceClassName, getDomainName } from "../utils/domain-names";
 import { getDeviceClassIcon, getDomainColor, getDomainIcon } from "../utils/icons";
 import { ddLocale, ddLocalize, ddLocalizePlural } from "../utils/localize";
@@ -48,19 +56,37 @@ import {
   normalizeHiddenHomeInformationCards,
   normalizeHiddenHomeSections,
   normalizeHomeSectionsOrder,
+  resolveHiddenHomeSections,
 } from "../utils/home-sections";
 import {
   addHomeScene,
   filterHomeSceneCandidates,
   homeSceneDomain,
   moveHomeScene,
-  moveHomeSceneTo,
   normalizeHomeScenes,
   pickableHomeSceneIds,
   removeHomeScene,
   type HomeSceneCandidate,
 } from "../utils/home-scenes";
 import { DD_NEXT_VERSION } from "../version";
+import { moveItemTo, sameItems, sameOrder } from "../utils/list-order";
+import {
+  isAreaLayoutDefault,
+  isAreasDisplayDefault,
+  isDeviceVisibilityDefault,
+  resetAreaLayout,
+  resetAreasDisplay,
+  resetDeviceVisibility,
+} from "../utils/settings-reset";
+import {
+  countHidden,
+  groupHiddenIds,
+  groupVisibility,
+  hidesOnToggle,
+  idsVisibility,
+  withIdsHidden,
+  type GroupVisibility,
+} from "../utils/visibility";
 import {
   MASTER_ACTION_CONFIRMATION_DOMAINS,
   masterActionConfirmationEnabled,
@@ -82,6 +108,7 @@ type SettingsPageKey =
   | "devices"
   | "people"
   | "areas"
+  | "favorites"
   | "replacements"
   | "permissions"
   | "support"
@@ -98,28 +125,37 @@ interface SettingsPageItem {
   summary?: string[];
 }
 
-interface DeviceVisibilityDevice {
-  deviceId: string;
+/** An entity the Devices page can show. People have no area. */
+interface DeviceVisibilityEntry {
+  entityId: string;
+  typeKey: string;
+  areaId: string;
+  deviceId?: string;
+}
+
+/** A device in an area of a type, or the entities without a device (no `deviceId`). */
+interface DeviceVisibilityDeviceNode {
+  deviceId?: string;
   name: string;
-  areaId: string;
-  areaName: string;
-  entityCount: number;
+  /** Hidden in all of Dwains Dashboard. */
   hidden: boolean;
+  entityIds: string[];
 }
 
-interface DeviceVisibilityAreaGroup {
+interface DeviceVisibilityAreaNode {
   areaId: string;
   areaName: string;
-  devices: DeviceVisibilityDevice[];
+  entityIds: string[];
+  devices: DeviceVisibilityDeviceNode[];
 }
 
-interface DeviceVisibilityTypeGroup {
+interface DeviceVisibilityTypeNode {
   key: string;
   label: string;
   icon: string;
   color: string;
-  devices: DeviceVisibilityDevice[];
-  areas: DeviceVisibilityAreaGroup[];
+  entityIds: string[];
+  areas: DeviceVisibilityAreaNode[];
 }
 
 interface HomeCameraSetting {
@@ -156,6 +192,7 @@ const SETTINGS_ICON_PATHS: Record<string, string> = {
   "mdi:home-edit-outline": mdiHomeEditOutline,
   "mdi:puzzle-edit-outline": mdiPuzzleEditOutline,
   "mdi:shield-account": mdiShieldAccount,
+  "mdi:star-outline": mdiStarOutline,
   "mdi:view-dashboard-edit": mdiViewDashboardEdit,
 };
 
@@ -247,6 +284,25 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   @state()
   private _draggedAreaCustomCardId?: string;
 
+  /** Types opened in the Devices page visibility tree. */
+  @state()
+  private _expandedDeviceTypes: ReadonlySet<string> = new Set();
+
+  /** The group order of the room in the settings was changed, so it can be copied to every room. */
+  @state()
+  private _areaGroupOrderChanged = false;
+
+  /**
+   * Order shown while an item of an order list is dragged. The list follows
+   * the pointer and the order is saved on drop.
+   */
+  @state()
+  private _dragPreview?: { list: string; order: readonly string[] };
+
+  /** Entity groups folded in the room settings. */
+  @state()
+  private _collapsedAreaGroups: ReadonlySet<string> = new Set();
+
   @state()
   private _dragOverAreaCustomCardTarget?: { placement: string; index: number };
 
@@ -272,7 +328,11 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _settingsPage: SettingsPageKey = restoreSettingsPage();
 
   @state()
-  private _homeSettingsDetail: 'overview' | 'house_information' | 'climate' | 'outdoor_climate' | 'cameras' | 'custom_cards' | 'favorites' | 'scenes' = 'overview';
+  private _homeSettingsDetail: 'overview' | 'house_information' | 'climate' | 'outdoor_climate' | 'cameras' | 'custom_cards' | 'scenes' = 'overview';
+
+  /** Page that opened the Favorites page with a "Manage favorites" link, for its back button. */
+  @state()
+  private _favoritesReturnPage?: "home" | "areas";
 
   // Dashboard-eigenschappen (naam + sidebar-icoon)
   @state() private _dashboardId?: string;
@@ -576,6 +636,20 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         ],
       },
       {
+        page: "favorites",
+        group: "general",
+        icon: "mdi:star-outline",
+        color: "#f59e0b",
+        title: this._t('favorites.title'),
+        description: this._t('settings.favorites_page_description'),
+        summary: [
+          this._tp('common.favorite', favoriteCount),
+          this._t(this._config?.settings?.show_suggested_favorites === false
+            ? 'settings.favorite_suggestions_off'
+            : 'settings.favorite_suggestions_on'),
+        ],
+      },
+      {
         page: "header",
         group: "general",
         icon: "mdi:card-account-details-star-outline",
@@ -584,7 +658,11 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         description: this._t('settings.header_status_description'),
         summary: [
           this._config?.settings?.show_notifications === false ? this._t('settings.notifications_hidden') : this._t('settings.notifications_shown'),
-          this._config?.settings?.alarm_entity_id ? this._t('settings.alarm_selected') : this._t('settings.no_alarm_selected'),
+          !this._config?.settings?.alarm_entity_id
+            ? this._t('settings.no_alarm_selected')
+            : this._config.settings.show_alarm === false
+              ? this._t('settings.alarm_hidden')
+              : this._t('settings.alarm_selected'),
         ],
       },
       {
@@ -628,6 +706,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         summary: [
           this._t('settings.types_visible', { visible: deviceTypeCount - hiddenDeviceTypeCount, total: deviceTypeCount }),
           this._t('settings.hidden_devices_count', { count: hiddenDeviceCount }),
+          this._tp('settings.hidden_entities_count', this._getDevicesPageHiddenEntityIds().size),
           devicesUnavailableMode,
         ],
       },
@@ -732,15 +811,32 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   private _openSettingsPage(page: Exclude<SettingsPageKey, "overview">): void {
     this._settingsPage = page;
+    this._favoritesReturnPage = undefined;
     rememberSettingsPage(page);
     this._closeInlinePickers();
   }
 
   private _backToSettingsOverview = (): void => {
     this._settingsPage = "overview";
+    this._favoritesReturnPage = undefined;
     rememberSettingsPage("overview");
     this._closeInlinePickers();
   };
+
+  /** "Manage favorites" link: opens the Favorites page, whose back button returns here. */
+  private _openFavoritesFrom(page: "home" | "areas", event?: Event): void {
+    event?.stopPropagation();
+    this._openSettingsPage("favorites");
+    this._favoritesReturnPage = page;
+  }
+
+  private _renderManageFavoritesLink(page: "home" | "areas") {
+    return html`
+      <button class="link manage-favorites-link" type="button" @click=${(event: Event) => this._openFavoritesFrom(page, event)}>
+        ${this._t('settings.manage_favorites')}
+      </button>
+    `;
+  }
 
   private _closeInlinePickers(): void {
     this._showEntityPicker = false;
@@ -791,10 +887,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     if (!item) return this._renderSettingsOverview();
 
     const homeDetail = page === 'home' ? this._homeSettingsDetailHeader() : undefined;
+    const returnPage = page === 'favorites' ? this._favoritesReturnPage : undefined;
+    const returnItem = returnPage
+      ? this._settingsOverviewItems().find((candidate) => candidate.page === returnPage)
+      : undefined;
     const title = homeDetail?.title || item.title;
     const description = homeDetail?.description || item.description;
-    const backLabel = homeDetail?.backLabel || this._t('settings.all_settings');
-    const backAction = homeDetail ? this._backFromHomeSettingsDetail : this._backToSettingsOverview;
+    const backLabel = homeDetail?.backLabel || returnItem?.title || this._t('settings.all_settings');
+    const backAction = homeDetail
+      ? this._backFromHomeSettingsDetail
+      : returnPage
+        ? () => this._openSettingsPage(returnPage)
+        : this._backToSettingsOverview;
 
     return html`
       <div class="editor-container">
@@ -827,7 +931,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
           ${this._renderNotificationSettingsPanel()}
           ${this._renderWeatherSettingsPanel()}
           ${this._renderAlarmSettingsPanel()}
-          ${this._renderNowPlayingSettingsPanel()}
         `;
       case "controls":
         return this._renderMasterActionConfirmationSettingsPanel();
@@ -837,6 +940,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         return this._renderPersonsSettingsPanel();
       case "areas":
         return this._renderAreasSettingsPanel();
+      case "favorites":
+        return this._renderFavoritesSettingsPanel();
       case "replacements":
         return this._renderReplacementsSettingsPanel();
       case "permissions":
@@ -982,7 +1087,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     if (section === 'devices') return 'house_information';
     if (section === 'cameras') return 'cameras';
     if (section === 'custom_cards') return 'custom_cards';
-    if (section === 'favorites') return 'favorites';
     if (section === 'scenes') return 'scenes';
     return undefined;
   }
@@ -1040,10 +1144,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         this._t(meta.descriptionKey),
         this._renderHomeCustomCardsSettings()
       );
-    }
-
-    if (this._homeSettingsDetail === 'favorites') {
-      return this._renderFavoritesSettingsPanel();
     }
 
     if (this._homeSettingsDetail === 'scenes') {
@@ -1165,8 +1265,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _renderFavoritesSettingsPanel() {
     return this._renderSettingsPanel(
       "mdi:star",
-      this._t('home_section.favorites.label'),
-      this._t('settings.favorites_description'),
+      this._t('favorites.title'),
+      this._t('settings.favorites_page_description'),
       html`
         <div class="favorites-section">
           <div class="favorite-suggestions-toggle">
@@ -1240,42 +1340,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     );
   }
 
-  private _renderNowPlayingSettingsPanel() {
-    const mode = normalizeNowPlayingMode(this._config?.settings?.now_playing_bar);
-    const modes: Array<{ value: NowPlayingMode; icon: string }> = [
-      { value: 'off', icon: 'mdi:music-off' },
-      { value: 'home', icon: 'mdi:home-outline' },
-      { value: 'all', icon: 'mdi:view-dashboard-outline' },
-    ];
-
-    return this._renderSettingsPanel(
-      "mdi:music-circle-outline",
-      this._t('now_playing.setting_title'),
-      this._t('now_playing.setting_description'),
-      html`
-        <div class="now-playing-settings">
-          <div class="area-order-modes" role="radiogroup" aria-label=${this._t('now_playing.setting_title')}>
-            ${modes.map(({ value, icon }) => html`
-              <button
-                type="button"
-                class="area-order-mode ${mode === value ? 'selected' : ''}"
-                role="radio"
-                aria-checked=${mode === value ? 'true' : 'false'}
-                @click=${() => this._setNowPlayingMode(value)}
-              >
-                <ha-icon .icon=${icon}></ha-icon>
-                <span>
-                  <strong>${this._t(`now_playing.mode_${value}`)}</strong>
-                  <small>${this._t(`now_playing.mode_${value}_description`)}</small>
-                </span>
-              </button>
-            `)}
-          </div>
-        </div>
-      `
-    );
-  }
-
   private _renderWeatherSettingsPanel() {
     return this._renderSettingsPanel(
       "mdi:weather-cloudy",
@@ -1321,6 +1385,16 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       this._t('settings.alarm_description'),
       html`
         <div class="alarm-section">
+          <div class="alarm-toggle">
+            <ha-formfield .label=${this._t('settings.show_alarm')}>
+              <ha-switch
+                .checked=${Boolean(this._config?.settings?.alarm_entity_id) && this._config?.settings?.show_alarm !== false}
+                .disabled=${!this._config?.settings?.alarm_entity_id}
+                @change=${this._toggleAlarmDisplay}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">${this._t('settings.show_alarm_description')}</p>
+          </div>
           <div class="alarm-picker">
             <div class="alarm-picker-header">
               <h4>${this._t('settings.selected_alarm')}</h4>
@@ -1366,8 +1440,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             </ha-formfield>
             <p class="toggle-description">${this._t('settings.show_new_devices_description')}</p>
           </div>
-          ${this._renderDeviceTypeVisibilitySettings()}
-          ${this._renderHiddenDeviceVisibility()}
+          ${this._renderDeviceVisibilityTree()}
         </div>
       `
     );
@@ -1433,6 +1506,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             <p class="toggle-description">${this._t('settings.hide_unavailable_areas_description')}</p>
           </div>
           <div class="hide-unavailable-toggle">
+            <ha-formfield .label=${this._t('settings.hide_area_name')}>
+              <ha-switch
+                .checked=${hidesAreaNameInEntityNames(this._config?.settings)}
+                @change=${this._toggleHideAreaName}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">${this._t('settings.hide_area_name_description')}</p>
+          </div>
+          <div class="hide-unavailable-toggle">
             <ha-formfield .label=${this._t('thermostat.setting_label')}>
               <ha-switch
                 .checked=${this._config?.settings?.show_area_thermostat !== false}
@@ -1440,6 +1522,27 @@ export class DwainsDashboardStrategyEditor extends LitElement {
               ></ha-switch>
             </ha-formfield>
             <p class="toggle-description">${this._t('thermostat.setting_description')}</p>
+          </div>
+          <div class="hide-unavailable-toggle">
+            <ha-formfield .label=${this._t('settings.show_area_favorites')}>
+              <ha-switch
+                .checked=${this._config?.settings?.show_area_favorites !== false}
+                @change=${this._toggleAreaFavorites}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">
+              ${this._t('settings.show_area_favorites_description')}
+              ${this._renderManageFavoritesLink('areas')}
+            </p>
+          </div>
+          <div class="hide-unavailable-toggle">
+            <ha-formfield .label=${this._t('settings.show_area_now_playing')}>
+              <ha-switch
+                .checked=${isAreaNowPlayingEnabled(this._config?.settings)}
+                @change=${this._toggleAreaNowPlaying}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">${this._t('settings.show_area_now_playing_description')}</p>
           </div>
           ${this._renderAreasConfiguration()}
         </div>
@@ -1453,11 +1556,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const areas = Object.values(this.hass.areas || {});
     const hiddenAreas = new Set(this._config.areas_display?.hidden || []);
     const sortMode = resolveAreaSortMode(this._config.areas_display);
-    const sortedAreas = sortAreas(
+    const storedAreas = sortAreas(
       areas,
       { ...this._config.areas_display, hidden: [] },
       ddLocale(this.hass)
     );
+    const areaById = new Map(storedAreas.map((area) => [area.area_id, area]));
+    const sortedAreas = this._previewOrder('areas', storedAreas.map((area) => area.area_id))
+      .map((areaId) => areaById.get(areaId)!);
     const sortModes: Array<{ mode: AreaSortMode; icon: string }> = [
       { mode: 'home_assistant', icon: 'mdi:home-assistant' },
       { mode: 'custom', icon: 'mdi:drag-vertical' },
@@ -1558,6 +1664,16 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             `;
           }
         )}
+      </div>
+      <div class="settings-reset-row">
+        <button
+          class="home-layout-reset"
+          type="button"
+          ?disabled=${isAreasDisplayDefault(this._config.areas_display)}
+          @click=${this._resetAreasConfiguration}
+        >
+          ${this._t('settings.reset_area_list')}
+        </button>
       </div>
     `;
   }
@@ -1735,21 +1851,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       return nothing;
     }
 
-    // Get all entities for this area (from entity registry and via states)
-    const areaEntities = this._configAreaEntities(this._area);
-    const seenEntities = new Set(areaEntities.map(entity => entity.entity_id));
-
-    // Also check states for entities that might not be in registry
-    if (this.hass?.states) {
-      Object.values(this.hass.states).forEach(state => {
-        if (!seenEntities.has(state.entity_id)) {
-          const entityRegistry = getEntityRegistry(this.hass)[state.entity_id];
-          if (entityRegistry?.area_id === this._area) {
-            areaEntities.push({ entity_id: state.entity_id });
-          }
-        }
-      });
-    }
+    // Config entities of this area plus states that only the registry places here.
+    const areaEntities = this._areaEditorEntities(this._area);
 
     // Get grouped entities WITHOUT filtering hidden ones
     const groups = this._getAreaGroupedEntitiesWithoutFiltering(
@@ -1765,8 +1868,9 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const allAreaEntityIds = AREA_STRATEGY_GROUPS.flatMap((group) => groups[group] || []);
     const ungroupedOrder = areaOptions.entity_order || [];
     const sortedUngroupedEntities = this._sortEntityIds(allAreaEntityIds, ungroupedOrder);
+    const displayedUngroupedEntities = this._previewOrder(this._entityDragList(UNGROUPED_ENTITY_DRAG_GROUP), sortedUngroupedEntities);
     const customCards = this._getAreaEditorCustomCards();
-    const groupedSections = this._sortAreaStrategyGroups(
+    const storedGroupedSections = this._sortAreaStrategyGroups(
       AREA_STRATEGY_GROUPS.filter((group) =>
         (groups[group] || []).length > 0 || customCards.some((entry) =>
           entry.placement === `after:${group}` ||
@@ -1774,6 +1878,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         )
       )
     );
+    const groupedSections = this._previewOrder(`area-groups:${this._area}`, storedGroupedSections);
 
     return html`
       <div class="editor-container">
@@ -1849,10 +1954,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             </div>
             <p class="area-order-hint secondary">${this._t('settings.area_entity_order_hint')}</p>
             <div class="sortable-container dragging-enabled ${this._draggedEntityGroup === UNGROUPED_ENTITY_DRAG_GROUP ? 'dragging' : ''}">
-              ${this._getAreaEditorFreeCardsForSlot(customCards, 0, sortedUngroupedEntities, entityGroupById)
+              ${this._getAreaEditorFreeCardsForSlot(customCards, 0, displayedUngroupedEntities, entityGroupById)
                 .map((entry) => this._renderAreaCustomCardEditorRow(entry))}
               ${repeat(
-                sortedUngroupedEntities,
+                displayedUngroupedEntities,
                 (entityId) => entityId,
                 (entityId, index) => {
                   const state = this.hass!.states[entityId];
@@ -1877,7 +1982,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                         <div class="handle"><ha-svg-icon .path=${mdiDrag}></ha-svg-icon></div>
                         <ha-state-icon .stateObj=${state} class="entity-icon"></ha-state-icon>
                         <span class="entity-name">
-                          ${state?.attributes?.friendly_name || entityId}
+                          ${this._areaEditorEntityName(entityId, area.name)}
                           <small>${this._getGroupTitle(entityGroup)}</small>
                         </span>
                         <div class="entity-order-buttons">
@@ -1901,7 +2006,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                         ></ha-icon-button>
                       </div>
                     </div>
-                    ${this._getAreaEditorFreeCardsForSlot(customCards, index + 1, sortedUngroupedEntities, entityGroupById)
+                    ${this._getAreaEditorFreeCardsForSlot(customCards, index + 1, displayedUngroupedEntities, entityGroupById)
                       .map((entry) => this._renderAreaCustomCardEditorRow(entry))}
                   `;
                 }
@@ -1909,48 +2014,60 @@ export class DwainsDashboardStrategyEditor extends LitElement {
               ${this._renderAreaCustomCardDropZone(`ungrouped:${sortedUngroupedEntities.length}`)}
             </div>
           </ha-expansion-panel>
-        ` : groupedSections.map((group, groupIndex) => {
+        ` : repeat(groupedSections, (group) => group, (group, groupIndex) => {
           // Get ALL entities for this group (don't filter hidden ones)
           const allGroupEntities = groups[group] || [];
           const groupOptions = this._config!.areas_options?.[this._area!]?.groups_options?.[group];
           const hiddenEntities = new Set(groupOptions?.hidden || []);
           const entityOrder = groupOptions?.order || [];
 
-          // Sort entities according to order
-          const sortedEntities = [...allGroupEntities].sort((a, b) => {
-            const aIndex = entityOrder.indexOf(a);
-            const bIndex = entityOrder.indexOf(b);
-            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-            if (aIndex !== -1) return -1;
-            if (bIndex !== -1) return 1;
-            // Sort by friendly name
-            const nameA = this.hass!.states[a]?.attributes?.friendly_name || a;
-            const nameB = this.hass!.states[b]?.attributes?.friendly_name || b;
-            return nameA.localeCompare(nameB);
-          });
+          // Stored order, or the order of a drag in progress.
+          const sortedEntities = this._previewOrder(
+            this._entityDragList(group),
+            this._sortEntityIds(allGroupEntities, entityOrder)
+          );
+          const groupHiddenCount = countHidden(allGroupEntities, hiddenEntities);
+          const groupVisibilityState = groupVisibility(allGroupEntities.length, groupHiddenCount);
 
           return html`
             <div
-              class="area-entity-section ${this._draggedEntitySection === group ? 'dragging' : ''} ${this._dragOverEntitySection === group ? 'drag-over' : ''}"
+              class="area-entity-section ${groupVisibilityState === 'hidden' ? 'is-hidden' : ''} ${this._draggedEntitySection === group ? 'dragging' : ''} ${this._dragOverEntitySection === group ? 'drag-over' : ''}"
               @dragover=${(event: DragEvent) => this._handleEntitySectionDragOver(event, group)}
-              @drop=${(event: DragEvent) => this._handleEntitySectionDrop(event, group, groupedSections)}
+              @drop=${(event: DragEvent) => this._handleEntitySectionDrop(event, group, storedGroupedSections)}
             >
-              <ha-expansion-panel expanded outlined>
+              <ha-expansion-panel
+                outlined
+                .expanded=${!this._collapsedAreaGroups.has(group)}
+                @expanded-changed=${(event: CustomEvent<{ expanded: boolean }>) => this._handleAreaGroupExpandedChanged(event, group)}
+              >
                 <div slot="header" class="area-entity-section-header">
                   <ha-icon icon=${AREA_STRATEGY_GROUP_ICONS[group]}></ha-icon>
-                  <span>${this._getGroupTitle(group)}</span>
+                  <span class="area-entity-section-title">
+                    ${this._getGroupTitle(group)}
+                    ${groupVisibilityState !== 'visible' ? html`
+                      <small>${this._t('settings.visible_count', {
+                        visible: allGroupEntities.length - groupHiddenCount,
+                        total: allGroupEntities.length,
+                      })}</small>
+                    ` : nothing}
+                  </span>
                   <span class="area-entity-section-actions">
+                    ${allGroupEntities.length ? this._renderVisibilityButton(
+                      groupVisibilityState,
+                      hidesOnToggle(groupVisibilityState) ? this._t('settings.hide_group') : this._t('settings.show_group'),
+                      () => this._setAreaEntityGroupHidden(group, allGroupEntities, hidesOnToggle(groupVisibilityState))
+                    ) : nothing}
                     <ha-icon-button
                       .label=${this._t('settings.move_up')}
                       .path=${mdiArrowUp}
                       .disabled=${groupIndex === 0}
-                      @click=${(event: Event) => this._moveEntitySection(event, groupedSections, groupIndex, -1)}
+                      @click=${(event: Event) => this._moveEntitySection(event, storedGroupedSections, groupIndex, -1)}
                     ></ha-icon-button>
                     <ha-icon-button
                       .label=${this._t('settings.move_down')}
                       .path=${mdiArrowDown}
                       .disabled=${groupIndex === groupedSections.length - 1}
-                      @click=${(event: Event) => this._moveEntitySection(event, groupedSections, groupIndex, 1)}
+                      @click=${(event: Event) => this._moveEntitySection(event, storedGroupedSections, groupIndex, 1)}
                     ></ha-icon-button>
                     <button
                       class="area-entity-section-handle"
@@ -1959,7 +2076,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                       title=${this._t('layout.drag_group')}
                       aria-label=${this._t('layout.drag_group')}
                       @click=${(event: Event) => event.stopPropagation()}
-                      @dragstart=${(event: DragEvent) => this._handleEntitySectionDragStart(event, group)}
+                      @dragstart=${(event: DragEvent) => this._handleEntitySectionDragStart(event, group, storedGroupedSections)}
                       @dragend=${this._handleEntitySectionDragEnd}
                     >
                       <ha-svg-icon .path=${mdiDrag}></ha-svg-icon>
@@ -2002,10 +2119,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                             class="entity-icon"
                           ></ha-state-icon>
                           <span class="entity-name">
-                            ${state?.attributes?.friendly_name || entityId}
+                            ${this._areaEditorEntityName(entityId, area.name)}
                           </span>
                           <ha-icon-button
-                            .label=${isHidden ? "Show" : "Hide"}
+                            .label=${isHidden ? this._t('common.show') : this._t('common.hide')}
                             .path=${isHidden ? mdiEye : mdiEyeOff}
                             @click=${() => this._toggleEntityVisibility(entityId, group)}
                           ></ha-icon-button>
@@ -2025,8 +2142,35 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         ${customCards.length || this._draggedAreaCustomCardId
           ? this._renderAreaCustomCardPlacement(customCards, 'bottom', this._t('layout.custom_cards_bottom'))
           : nothing}
+        <div class="settings-reset-row area-editor-reset-row">
+          ${entityLayout === 'grouped' ? html`
+            <button
+              class="home-layout-reset"
+              type="button"
+              title=${this._t('settings.apply_group_order_all_description')}
+              ?disabled=${!this._areaGroupOrderChanged}
+              @click=${this._applyAreaGroupOrderToAllAreas}
+            >
+              ${this._t('settings.apply_group_order_all')}
+            </button>
+          ` : nothing}
+          <button
+            class="home-layout-reset"
+            type="button"
+            ?disabled=${isAreaLayoutDefault(areaOptions)}
+            @click=${this._resetAreaLayout}
+          >
+            ${this._t('settings.reset_room_layout')}
+          </button>
+        </div>
       </div>
     `;
+  }
+
+  /** Entity name in the room settings, like the room page shows it. */
+  private _areaEditorEntityName(entityId: string, areaName: string): string {
+    const fullName = this.hass?.states?.[entityId]?.attributes?.friendly_name || entityId;
+    return areaEntityDisplayName(String(fullName), areaName, this._config?.settings);
   }
 
   private _getHomeSectionsOrder(): HomeSectionKey[] {
@@ -2034,7 +2178,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _getHiddenHomeSections(): Set<HomeSectionKey> {
-    return new Set(normalizeHiddenHomeSections(this._config?.settings?.home_sections_hidden));
+    return new Set(resolveHiddenHomeSections(this._config?.settings));
   }
 
   private _getHiddenHomeInformationCards(): Set<HomeInformationCardKey> {
@@ -2134,11 +2278,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _setHomeSectionsOrder(order: HomeSectionKey[]): void {
     if (!this._config) return;
 
+    // Order and hidden list are saved together, so sections that older
+    // settings hide (Now playing) stay hidden once they are managed here.
     const newConfig: DwainsDashboardConfig = {
       ...this._config,
       settings: {
         ...this._config.settings,
         home_sections_order: normalizeHomeSectionsOrder(order),
+        home_sections_hidden: [...this._getHiddenHomeSections()],
       },
     };
 
@@ -2159,6 +2306,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       ...this._config,
       settings: {
         ...this._config.settings,
+        home_sections_order: this._getHomeSectionsOrder(),
         home_sections_hidden: normalizeHiddenHomeSections([...hidden]),
       },
     };
@@ -2215,7 +2363,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderHomeSectionOrder() {
-    const order = this._getHomeSectionsOrder();
+    const order = this._previewOrder('home-sections', this._getHomeSectionsOrder());
     const hiddenSections = this._getHiddenHomeSections();
 
     return html`
@@ -2233,13 +2381,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                 this._draggedHomeSection !== section;
 
               const detail = this._homeSectionDetail(section);
+              const isFavorites = section === 'favorites';
+              const hasDetail = Boolean(detail) || isFavorites;
               return html`
                 <div
-                  class="home-section-item ${enabled ? '' : 'disabled'} ${detail ? 'has-detail' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}"
+                  class="home-section-item ${enabled ? '' : 'disabled'} ${hasDetail ? 'has-detail' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}"
                   draggable="true"
                   data-section=${section}
                   data-index=${index}
-                  @click=${() => detail && this._openHomeSectionDetail(section)}
+                  @click=${() => isFavorites ? this._openFavoritesFrom('home') : detail && this._openHomeSectionDetail(section)}
                   @dragstart=${(e: DragEvent) => this._handleHomeSectionDragStart(e, section)}
                   @dragend=${this._handleHomeSectionDragEnd}
                   @dragover=${(e: DragEvent) => this._handleHomeSectionDragOver(e, index)}
@@ -2254,9 +2404,12 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                   </div>
                   <div class="home-section-copy">
                     <div class="home-section-title">${this._t(meta.labelKey)}</div>
-                    <div class="home-section-description">${this._t(meta.descriptionKey)}</div>
+                    <div class="home-section-description">
+                      ${this._t(meta.descriptionKey)}
+                      ${isFavorites ? this._renderManageFavoritesLink('home') : nothing}
+                    </div>
                   </div>
-                  ${detail ? html`<ha-svg-icon class="home-section-detail-chevron" .path=${mdiChevronRight}></ha-svg-icon>` : nothing}
+                  ${hasDetail ? html`<ha-svg-icon class="home-section-detail-chevron" .path=${mdiChevronRight}></ha-svg-icon>` : nothing}
                   <div class="home-section-actions" @click=${(event: Event) => event.stopPropagation()}>
                     <button
                       class="home-section-toggle ${enabled ? 'enabled' : ''}"
@@ -2575,7 +2728,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderHomeCameraSettings() {
-    const cameras = this._getHomeCameraSettings();
+    const storedCameras = this._getHomeCameraSettings();
+    const cameraById = new Map(storedCameras.map(camera => [camera.entityId, camera]));
+    const cameras = this._previewOrder('home-cameras', storedCameras.map(camera => camera.entityId))
+      .map(entityId => cameraById.get(entityId)!);
     const hidden = new Set(this._config?.settings?.home_cameras_hidden || []);
     const visibleCount = cameras.filter(camera => !hidden.has(camera.entityId)).length;
 
@@ -2712,7 +2868,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderHomeScenesSettings() {
-    const picked = this._getHomeScenes();
+    const picked = this._previewOrder('home-scenes', this._getHomeScenes());
 
     return html`
       <div class="home-info-card-section home-scene-settings-section">
@@ -2863,6 +3019,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   private _handleHomeSceneDragStart(event: DragEvent, entityId: string): void {
     this._draggedHomeScene = entityId;
+    this._startDragPreview('home-scenes', this._getHomeScenes());
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', entityId);
@@ -2872,12 +3029,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeSceneDragEnd = (): void => {
     this._draggedHomeScene = undefined;
     this._dragOverHomeSceneIndex = undefined;
+    this._cancelDragPreview('home-scenes');
   };
 
   private _handleHomeSceneDragOver(event: DragEvent, index: number): void {
     if (!this._draggedHomeScene) return;
     event.preventDefault();
     this._dragOverHomeSceneIndex = index;
+    this._moveDragPreview('home-scenes', this._draggedHomeScene, index);
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
   }
 
@@ -2890,68 +3049,27 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeSceneDrop(event: DragEvent, dropIndex: number): void {
     event.preventDefault();
     const dragged = this._draggedHomeScene;
-    this._handleHomeSceneDragEnd();
     if (!dragged) return;
-    const current = this._getHomeScenes();
-    const next = moveHomeSceneTo(current, dragged, dropIndex);
-    if (next.join('|') !== current.join('|')) this._setHomeScenes(next);
+    this._moveDragPreview('home-scenes', dragged, dropIndex);
+    const next = this._finishDragPreview('home-scenes', this._getHomeScenes());
+    this._handleHomeSceneDragEnd();
+    if (next) this._setHomeScenes(next);
   }
 
-  private _renderDeviceTypeVisibilitySettings() {
-    const options = this._getDeviceTypeOptions();
-    if (!options.length) return nothing;
-
-    const hidden = this._getHiddenDeviceTypes();
-    const visibleCount = options.filter((option) => !hidden.has(option.key)).length;
-
-    return html`
-      <div class="device-types-visibility">
-        <div class="device-types-header">
-          <div>
-            <h4>${this._t('settings.devices_page_types')}</h4>
-            <p>${this._t('settings.devices_page_types_description')}</p>
-          </div>
-          <span>${this._t('settings.visible_count', { visible: visibleCount, total: options.length })}</span>
-        </div>
-        <div class="device-types-grid">
-          ${options.map((option) => {
-            const enabled = !hidden.has(option.key);
-            return html`
-              <div
-                class="device-type-option ${enabled ? 'enabled' : 'disabled'}"
-                style=${`--device-type-color: ${option.color};`}
-              >
-                <div class="device-type-icon">
-                  <ha-icon icon=${option.icon}></ha-icon>
-                </div>
-                <div class="device-type-copy">
-                  <div class="device-type-name">${option.label}</div>
-                  <div class="device-type-count">${this._tp('common.entity', option.count)}</div>
-                </div>
-                <ha-switch
-                  .checked=${enabled}
-                  @change=${(event: Event) => this._setDeviceTypeVisible(option.key, (event.target as any).checked)}
-                ></ha-switch>
-              </div>
-            `;
-          })}
-        </div>
-      </div>
-    `;
-  }
-
-  private _renderHiddenDeviceVisibility() {
-    const groups = this._getDeviceVisibilityGroups();
-    const hiddenDevices = this._getHiddenDeviceIds();
-    const allDeviceIds = this._uniqueDeviceIdsFromGroups(groups);
-    const hiddenKnownDeviceCount = allDeviceIds.filter((deviceId) => hiddenDevices.has(deviceId)).length;
-
-    if (groups.length === 0) {
+  /**
+   * Devices page visibility as a tree: type > area > device > entity. The
+   * type eye hides the type group in the sidebar, the area and entity eyes
+   * hide entities on the Devices page only and the device switch hides a
+   * complete device in all of Dwains Dashboard.
+   */
+  private _renderDeviceVisibilityTree() {
+    const types = this._getDeviceVisibilityTree();
+    if (!types.length) {
       return html`
-        <div class="device-admission-section">
+        <div class="device-visibility-section">
           <div class="device-types-header">
             <div>
-              <h4>${this._t('settings.hidden_devices')}</h4>
+              <h4>${this._t('settings.devices_page_types')}</h4>
               <p>${this._t('settings.no_hidden_devices')}</p>
             </div>
           </div>
@@ -2959,254 +3077,362 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       `;
     }
 
+    const hiddenTypes = this._getHiddenDeviceTypes();
+    const visibleTypeCount = types.filter((type) => !hiddenTypes.has(type.key)).length;
+
     return html`
-      <div class="device-admission-section">
+      <div class="device-visibility-section">
         <div class="device-types-header">
           <div>
-            <h4>${this._t('settings.hidden_devices')}</h4>
-            <p>${this._t('settings.hidden_devices_description')}</p>
+            <h4>${this._t('settings.devices_page_types')}</h4>
+            <p>${this._t('settings.devices_visibility_description')}</p>
           </div>
-          <span>${hiddenKnownDeviceCount}/${allDeviceIds.length} hidden</span>
+          <span>${this._t('settings.visible_count', { visible: visibleTypeCount, total: types.length })}</span>
         </div>
-
-        <div class="device-admission-global-actions">
+        <div class="device-visibility-tree">
+          ${repeat(types, (type) => type.key, (type) => this._renderDeviceVisibilityType(type))}
+        </div>
+        <div class="settings-reset-row">
           <button
+            class="home-layout-reset"
             type="button"
-            ?disabled=${hiddenKnownDeviceCount === 0}
-            @click=${() => this._setDevicesHidden(allDeviceIds, false)}
+            ?disabled=${isDeviceVisibilityDefault(this._config?.settings, this._config?.device_admission)}
+            @click=${this._resetDeviceVisibility}
           >
-            <ha-icon icon="mdi:eye-outline"></ha-icon>
-            ${this._t('settings.show_all_devices')}
-          </button>
-          <button
-            type="button"
-            ?disabled=${allDeviceIds.length === 0 || hiddenKnownDeviceCount >= allDeviceIds.length}
-            @click=${() => this._setDevicesHidden(allDeviceIds, true)}
-          >
-            <ha-icon icon="mdi:eye-off-outline"></ha-icon>
-            ${this._t('settings.hide_all_devices')}
+            ${this._t('settings.reset_devices_visibility')}
           </button>
         </div>
+      </div>
+    `;
+  }
 
-        <div class="device-admission-groups">
+  private _renderDeviceVisibilityType(type: DeviceVisibilityTypeNode) {
+    // The eye shows the choices made on this page; the count also leaves out
+    // the entities of hidden devices.
+    const typeHidden = this._getHiddenDeviceTypes().has(type.key);
+    const entitiesVisibility = idsVisibility(type.entityIds, this._getDevicesPageHiddenEntityIds());
+    const visibility: GroupVisibility = typeHidden ? 'hidden' : entitiesVisibility;
+    const visibleCount = typeHidden
+      ? 0
+      : type.entityIds.length - countHidden(type.entityIds, this._getDeviceVisibilityHiddenEntities());
+    const expandable = type.areas.length > 0;
+    const expanded = expandable && this._expandedDeviceTypes.has(type.key);
+
+    return html`
+      <section
+        class="device-visibility-type is-${visibility} ${expanded ? 'open' : ''}"
+        style=${`--device-type-color: ${type.color};`}
+      >
+        <div class="device-visibility-type-row">
+          <button
+            class="device-visibility-type-toggle"
+            type="button"
+            aria-expanded=${expandable ? (expanded ? 'true' : 'false') : nothing}
+            ?disabled=${!expandable}
+            @click=${() => this._toggleExpandedDeviceType(type.key)}
+          >
+            <span class="device-type-icon small"><ha-icon icon=${type.icon}></ha-icon></span>
+            <span class="device-visibility-copy">
+              <strong>${type.label}</strong>
+              <small>${this._t('settings.visible_count', { visible: visibleCount, total: type.entityIds.length })}</small>
+            </span>
+            ${expandable ? html`
+              <ha-icon class="device-visibility-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+            ` : nothing}
+          </button>
+          ${this._renderVisibilityButton(
+            visibility,
+            hidesOnToggle(visibility) ? this._t('settings.hide_type') : this._t('settings.show_type'),
+            () => this._toggleDeviceTypeVisibility(type, entitiesVisibility)
+          )}
+        </div>
+        ${expanded ? html`
+          <div class="device-visibility-areas">
+            ${repeat(type.areas, (area) => area.areaId, (area) => this._renderDeviceVisibilityArea(type, area, typeHidden))}
+          </div>
+        ` : nothing}
+      </section>
+    `;
+  }
+
+  private _renderDeviceVisibilityArea(type: DeviceVisibilityTypeNode, area: DeviceVisibilityAreaNode, typeHidden: boolean) {
+    const hiddenCount = countHidden(area.entityIds, this._getDeviceVisibilityHiddenEntities());
+    const visibility = idsVisibility(area.entityIds, this._getDevicesPageHiddenEntityIds());
+    const hide = hidesOnToggle(visibility);
+
+    return html`
+      <section class="device-visibility-area ${typeHidden ? 'type-hidden' : ''}">
+        <div class="device-visibility-area-header">
+          <span class="device-visibility-copy">
+            <strong>${area.areaName}</strong>
+            <small>${this._t('settings.visible_count', { visible: area.entityIds.length - hiddenCount, total: area.entityIds.length })}</small>
+          </span>
+          ${this._renderVisibilityButton(
+            visibility,
+            hide ? this._t('settings.hide_area') : this._t('settings.show_area'),
+            () => this._setDevicesPageEntitiesHidden(area.entityIds, hide)
+          )}
+        </div>
+        ${repeat(
+          area.devices,
+          (device) => `${type.key}-${area.areaId}-${device.deviceId || ''}`,
+          (device) => this._renderDeviceVisibilityDevice(type, area, device)
+        )}
+      </section>
+    `;
+  }
+
+  private _renderDeviceVisibilityDevice(
+    type: DeviceVisibilityTypeNode,
+    area: DeviceVisibilityAreaNode,
+    device: DeviceVisibilityDeviceNode
+  ) {
+    const deviceId = device.deviceId;
+    return html`
+      <div class="device-visibility-device ${device.hidden ? 'device-hidden' : ''}">
+        ${deviceId ? html`
+          <div class="device-visibility-device-row">
+            <ha-icon class="device-visibility-device-icon" icon="mdi:devices" aria-hidden="true"></ha-icon>
+            <span class="device-visibility-copy">
+              <strong>${device.name}</strong>
+              <small>${this._t(device.hidden ? 'settings.device_hidden_everywhere' : 'settings.device_visible_everywhere')}</small>
+            </span>
+            <ha-switch
+              .checked=${!device.hidden}
+              aria-label=${device.name}
+              @change=${(event: Event) => this._setDeviceHidden(deviceId, !(event.target as any).checked)}
+            ></ha-switch>
+          </div>
+        ` : nothing}
+        <div class="device-visibility-entities">
           ${repeat(
-            groups,
-            (group) => group.key,
-            (group, index) => {
-              const groupDeviceIds = this._uniqueDeviceIds(group.devices);
-              const hiddenInGroup = groupDeviceIds.filter((deviceId) => hiddenDevices.has(deviceId)).length;
-              return html`
-                <ha-expansion-panel outlined ?expanded=${index === 0}>
-                  <div slot="header" class="device-admission-panel-header" style=${`--device-type-color: ${group.color};`}>
-                    <span class="device-type-icon small">
-                      <ha-icon icon=${group.icon}></ha-icon>
-                    </span>
-                    <span>${group.label}</span>
-                    <small>${this._t('settings.visible_count', { visible: groupDeviceIds.length - hiddenInGroup, total: groupDeviceIds.length })}</small>
-                  </div>
-
-                  <div class="device-admission-panel">
-                    <div class="device-admission-group-actions">
-                      <button
-                        type="button"
-                        ?disabled=${hiddenInGroup === 0}
-                        @click=${() => this._setDevicesHidden(groupDeviceIds, false)}
-                      >
-                        ${this._t('settings.show_type')}
-                      </button>
-                      <button
-                        type="button"
-                        ?disabled=${hiddenInGroup === groupDeviceIds.length}
-                        @click=${() => this._setDevicesHidden(groupDeviceIds, true)}
-                      >
-                        ${this._t('settings.hide_type')}
-                      </button>
-                    </div>
-
-                    ${repeat(
-                      group.areas,
-                      (areaGroup) => `${group.key}-${areaGroup.areaId}`,
-                      (areaGroup) => {
-                        const areaDeviceIds = this._uniqueDeviceIds(areaGroup.devices);
-                        const hiddenInArea = areaDeviceIds.filter((deviceId) => hiddenDevices.has(deviceId)).length;
-                        return html`
-                          <section class="device-admission-area">
-                            <div class="device-admission-area-header">
-                              <div>
-                                <strong>${areaGroup.areaName}</strong>
-                                <span>${this._t('settings.visible_count', { visible: areaDeviceIds.length - hiddenInArea, total: areaDeviceIds.length })}</span>
-                              </div>
-                              <div class="device-admission-area-actions">
-                                <button
-                                  type="button"
-                                  ?disabled=${hiddenInArea === 0}
-                                  @click=${() => this._setDevicesHidden(areaDeviceIds, false)}
-                                >
-                                  ${this._t('settings.show_area')}
-                                </button>
-                                <button
-                                  type="button"
-                                  ?disabled=${hiddenInArea === areaDeviceIds.length}
-                                  @click=${() => this._setDevicesHidden(areaDeviceIds, true)}
-                                >
-                                  ${this._t('settings.hide_area')}
-                                </button>
-                              </div>
-                            </div>
-                            <div class="device-admission-device-list">
-                              ${repeat(
-                                areaGroup.devices,
-                                (device) => `${group.key}-${device.deviceId}`,
-                                (device) => this._renderDeviceVisibilityRow(device, group)
-                              )}
-                            </div>
-                          </section>
-                        `;
-                      }
-                    )}
-                  </div>
-                </ha-expansion-panel>
-              `;
-            }
+            device.entityIds,
+            (entityId) => entityId,
+            (entityId) => this._renderDeviceVisibilityEntity(type, area, entityId, device.hidden)
           )}
         </div>
       </div>
     `;
   }
 
-  private _renderDeviceVisibilityRow(device: DeviceVisibilityDevice, group: DeviceVisibilityTypeGroup) {
-    const visible = !device.hidden;
+  private _renderDeviceVisibilityEntity(
+    type: DeviceVisibilityTypeNode,
+    area: DeviceVisibilityAreaNode,
+    entityId: string,
+    deviceHidden: boolean
+  ) {
+    const hidden = this._getDevicesPageHiddenEntityIds().has(entityId);
+    const visibility: GroupVisibility = hidden || deviceHidden ? 'hidden' : 'visible';
+    const state = this.hass?.states?.[entityId];
+    const fullName = String(state?.attributes?.friendly_name || entityId);
+
     return html`
-      <div
-        class="device-admission-device ${visible ? "visible" : "hidden"}"
-        style=${`--device-type-color: ${group.color};`}
-      >
-        <div class="device-type-icon">
-          <ha-icon icon=${group.icon}></ha-icon>
-        </div>
-        <div class="device-admission-copy">
-          <div class="device-type-name">${device.name}</div>
-          <div class="device-type-count">
-            ${device.entityCount === 1 ? "1 entity" : `${device.entityCount} entities`} · ${visible ? "Visible in DD" : "Hidden in DD"}
-          </div>
-        </div>
-        <ha-switch
-          .checked=${visible}
-          @change=${(event: Event) => this._setDeviceHidden(device.deviceId, !(event.target as any).checked)}
-        ></ha-switch>
+      <div class="device-visibility-entity is-${visibility}">
+        ${state
+          ? html`<ha-state-icon class="device-visibility-entity-icon" .hass=${this.hass} .stateObj=${state}></ha-state-icon>`
+          : html`<ha-icon class="device-visibility-entity-icon" icon=${type.icon}></ha-icon>`}
+        <span class="device-visibility-entity-name" title=${fullName}>
+          ${areaEntityDisplayName(fullName, area.areaName, this._config?.settings)}
+        </span>
+        ${deviceHidden
+          ? html`<span class="device-visibility-entity-note">${this._t('settings.hidden_with_device')}</span>`
+          : this._renderVisibilityButton(
+            visibility,
+            hidden ? this._t('common.show') : this._t('common.hide'),
+            () => this._setDevicesPageEntitiesHidden([entityId], !hidden)
+          )}
       </div>
     `;
   }
 
-  private _getDeviceVisibilityGroups(): DeviceVisibilityTypeGroup[] {
+  private _toggleExpandedDeviceType(typeKey: string): void {
+    const next = new Set(this._expandedDeviceTypes);
+    if (next.has(typeKey)) next.delete(typeKey);
+    else next.add(typeKey);
+    this._expandedDeviceTypes = next;
+  }
+
+  /**
+   * The type eye: a hidden type is shown again, a type whose entities are all
+   * hidden one by one shows them again, and otherwise the type is hidden.
+   */
+  private _toggleDeviceTypeVisibility(type: DeviceVisibilityTypeNode, entitiesVisibility: GroupVisibility): void {
+    if (this._getHiddenDeviceTypes().has(type.key)) {
+      this._setDeviceTypeVisible(type.key, true);
+    } else if (entitiesVisibility === 'hidden') {
+      this._setDevicesPageEntitiesHidden(type.entityIds, false);
+    } else {
+      this._setDeviceTypeVisible(type.key, false);
+    }
+  }
+
+  /** Entities hidden on the Devices page only. */
+  private _getDevicesPageHiddenEntityIds(): ReadonlySet<string> {
+    return getDevicesPageHiddenEntityIdSet(this._config);
+  }
+
+  /** Entities the Devices page leaves out: hidden on that page or part of a hidden device. */
+  private _getDeviceVisibilityHiddenEntities(): ReadonlySet<string> {
+    return this._deviceVisibilityHiddenEntities(this._getDeviceVisibilityEntries(), this._config?.device_admission);
+  }
+
+  private _deviceVisibilityHiddenEntities = memoizeOne((
+    entries: DeviceVisibilityEntry[],
+    admission: DwainsDashboardConfig['device_admission']
+  ): ReadonlySet<string> => {
+    const hiddenDevices = new Set(admission?.hidden_devices || []);
+    const hidden = new Set<string>((admission?.hidden_entities || []).filter(Boolean));
+    entries.forEach((entry) => {
+      if (entry.deviceId && hiddenDevices.has(entry.deviceId)) hidden.add(entry.entityId);
+    });
+    return hidden;
+  });
+
+  private _setDevicesPageEntitiesHidden(entityIds: string[], hidden: boolean): void {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      device_admission: {
+        ...this._config.device_admission,
+        hidden_entities: withIdsHidden(this._config.device_admission?.hidden_entities, entityIds, hidden).sort(),
+      },
+    });
+  }
+
+  /** Entities the Devices page can show, with their type, area and device. */
+  private _getDeviceVisibilityEntries(): DeviceVisibilityEntry[] {
     if (!this.hass || !this._config) return [];
+    return this._deviceVisibilityEntries(this.hass.states, this._config, getEntityRegistry(this.hass));
+  }
 
-    const deviceById = this._getAllDevicesById();
-    const hiddenDevices = this._getHiddenDeviceIds();
-    const collator = new Intl.Collator(ddLocale(this.hass), {
-      numeric: true,
-      sensitivity: "base",
-    });
-    const orderedAreas = sortAreas(
-      this._config.areas || [],
-      { ...this._config.areas_display, hidden: [] },
-      ddLocale(this.hass)
-    );
-    const areaOrder = new Map(orderedAreas.map((area, index) => [area.area_id, index]));
-    const compareArea = (a: { areaId: string; areaName: string }, b: { areaId: string; areaName: string }) => {
-      const aIndex = areaOrder.get(a.areaId) ?? Number.MAX_SAFE_INTEGER;
-      const bIndex = areaOrder.get(b.areaId) ?? Number.MAX_SAFE_INTEGER;
-      return aIndex - bIndex || collator.compare(a.areaName, b.areaName);
+  private _deviceVisibilityEntries = memoizeOne((
+    states: HomeAssistant['states'],
+    config: DwainsDashboardConfig,
+    registry: ReturnType<typeof getEntityRegistry>
+  ): DeviceVisibilityEntry[] => {
+    const entries: DeviceVisibilityEntry[] = [];
+    const processed = new Set<string>();
+    const knownAreas = new Set((config.areas || []).map((area) => area.area_id));
+    const hiddenAreas = new Set(config.areas_display?.hidden || []);
+    const deviceAreas = new Map((config.devices || []).map((device) => [device.device_id, device.area_id]));
+    const hideUnavailable = config.settings?.hide_unavailable_entities_on_devices !== false;
+
+    const addEntity = (entityId: string, areaId?: string | null, deviceId?: string | null) => {
+      if (!entityId || processed.has(entityId)) return;
+      const entry = registry[entityId];
+      if (entry?.hidden_by || entry?.entity_category === 'diagnostic' || entry?.entity_category === 'config') return;
+
+      const resolvedAreaId = areaId || (deviceId ? deviceAreas.get(deviceId) : undefined) || entry?.area_id;
+      if (!resolvedAreaId || !knownAreas.has(resolvedAreaId) || hiddenAreas.has(resolvedAreaId)) return;
+      if (getAreaHiddenEntityIdSet(config, resolvedAreaId).has(entityId)) return;
+
+      const state = states[entityId];
+      if (hideUnavailable && (!state || isHiddenAsUnavailable(state))) return;
+
+      const typeKey = this._deviceTypeKeyForEntityId(entityId);
+      if (!typeKey) return;
+
+      processed.add(entityId);
+      entries.push({
+        entityId,
+        typeKey,
+        areaId: resolvedAreaId,
+        deviceId: deviceId || entry?.device_id || undefined,
+      });
     };
-    const entityRecords = new Map<string, { entityId: string; deviceId?: string | null; areaId?: string | null }>();
 
-    (this._config.entities || []).forEach((entity) => {
-      entityRecords.set(entity.entity_id, {
-        entityId: entity.entity_id,
-        deviceId: entity.device_id,
-        areaId: entity.area_id,
-      });
+    (config.entities || []).forEach((entity) => addEntity(entity.entity_id, entity.area_id, entity.device_id));
+    Object.values(states || {}).forEach((state: any) => {
+      addEntity(state.entity_id, state.attributes?.area_id, registry[state.entity_id]?.device_id);
     });
 
-    Object.values(getEntityRegistry(this.hass)).forEach((entity: any) => {
-      entityRecords.set(entity.entity_id, {
-        entityId: entity.entity_id,
-        deviceId: entity.device_id,
-        areaId: entity.area_id,
-      });
+    // People have their own group, without areas or devices.
+    const hiddenPersons = new Set(config.settings?.hidden_persons || []);
+    Object.values(states || {}).forEach((state: any) => {
+      const entityId = state.entity_id;
+      if (!entityId?.startsWith('person.') || processed.has(entityId) || hiddenPersons.has(entityId)) return;
+      if (registry[entityId]?.hidden_by) return;
+      processed.add(entityId);
+      entries.push({ entityId, typeKey: 'person', areaId: '' });
     });
 
-    const typeDeviceEntities = new Map<string, Map<string, Set<string>>>();
+    return entries;
+  });
 
-    entityRecords.forEach((record) => {
-      const deviceId = record.deviceId;
-      if (!deviceId || !deviceById.has(deviceId)) return;
-      if (!this._isDeviceManagedEntity(record.entityId)) return;
+  private _getDeviceVisibilityTree(): DeviceVisibilityTypeNode[] {
+    if (!this.hass || !this._config) return [];
+    return this._deviceVisibilityTree(this._getDeviceVisibilityEntries(), this._config, ddLocale(this.hass));
+  }
 
-      const typeKey = this._deviceTypeKeyForEntityId(record.entityId);
-      if (!typeKey || typeKey === "person") return;
+  private _deviceVisibilityTree = memoizeOne((
+    entries: DeviceVisibilityEntry[],
+    config: DwainsDashboardConfig,
+    locale: string
+  ): DeviceVisibilityTypeNode[] => {
+    const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
+    const devicesById = this._getAllDevicesById();
+    const hiddenDevices = new Set(config.device_admission?.hidden_devices || []);
+    const orderedAreas = sortAreas(config.areas || [], { ...config.areas_display, hidden: [] }, locale);
+    const areaIndex = new Map(orderedAreas.map((area, index) => [area.area_id, index]));
+    const areaNames = new Map(orderedAreas.map((area) => [area.area_id, area.name]));
+    const entityName = (entityId: string) => String(this.hass?.states?.[entityId]?.attributes?.friendly_name || entityId);
+    const byName = (a: string, b: string) => collator.compare(entityName(a), entityName(b));
 
-      let devicesForType = typeDeviceEntities.get(typeKey);
-      if (!devicesForType) {
-        devicesForType = new Map();
-        typeDeviceEntities.set(typeKey, devicesForType);
-      }
-
-      let entityIds = devicesForType.get(deviceId);
-      if (!entityIds) {
-        entityIds = new Set();
-        devicesForType.set(deviceId, entityIds);
-      }
-      entityIds.add(record.entityId);
+    const byType = new Map<string, DeviceVisibilityEntry[]>();
+    entries.forEach((entry) => {
+      const list = byType.get(entry.typeKey) || [];
+      list.push(entry);
+      byType.set(entry.typeKey, list);
     });
 
-    return [...typeDeviceEntities.entries()]
-      .map(([key, deviceMap]) => {
-        const devices = [...deviceMap.entries()]
-          .map(([deviceId, entityIds]) => {
-            const device = deviceById.get(deviceId)!;
-            const area = this._deviceVisibilityArea(device, [...entityIds]);
-            if (!area) return undefined;
-            return {
-              deviceId,
-              name: device.name || deviceId,
-              areaId: area.areaId,
-              areaName: area.areaName,
-              entityCount: entityIds.size,
-              hidden: hiddenDevices.has(deviceId),
-            };
-          })
-          .filter((device): device is DeviceVisibilityDevice => Boolean(device))
-          .sort((a, b) => compareArea(a, b) || collator.compare(a.name, b.name));
-
-        const areaMap = new Map<string, DeviceVisibilityAreaGroup>();
-        devices.forEach((device) => {
-          let areaGroup = areaMap.get(device.areaId);
-          if (!areaGroup) {
-            areaGroup = {
-              areaId: device.areaId,
-              areaName: device.areaName,
-              devices: [],
-            };
-            areaMap.set(device.areaId, areaGroup);
-          }
-          areaGroup.devices.push(device);
+    return [...byType.entries()]
+      .map(([key, typeEntries]) => {
+        const byArea = new Map<string, DeviceVisibilityEntry[]>();
+        typeEntries.forEach((entry) => {
+          if (!entry.areaId) return;
+          const list = byArea.get(entry.areaId) || [];
+          list.push(entry);
+          byArea.set(entry.areaId, list);
         });
 
-        const areas = [...areaMap.values()].sort(compareArea);
+        const areas = [...byArea.entries()]
+          .sort(([a], [b]) => (areaIndex.get(a) ?? Number.MAX_SAFE_INTEGER) - (areaIndex.get(b) ?? Number.MAX_SAFE_INTEGER))
+          .map(([areaId, areaEntries]): DeviceVisibilityAreaNode => {
+            const byDevice = new Map<string, string[]>();
+            areaEntries.forEach((entry) => {
+              const deviceKey = entry.deviceId && devicesById.has(entry.deviceId) ? entry.deviceId : '';
+              const list = byDevice.get(deviceKey) || [];
+              list.push(entry.entityId);
+              byDevice.set(deviceKey, list);
+            });
+            const devices = [...byDevice.entries()]
+              .map(([deviceId, entityIds]): DeviceVisibilityDeviceNode => ({
+                deviceId: deviceId || undefined,
+                name: deviceId ? devicesById.get(deviceId)?.name || deviceId : '',
+                hidden: Boolean(deviceId) && hiddenDevices.has(deviceId),
+                entityIds: entityIds.sort(byName),
+              }))
+              // Entities without a device come last.
+              .sort((a, b) => Number(!a.deviceId) - Number(!b.deviceId) || collator.compare(a.name, b.name));
+            return {
+              areaId,
+              areaName: areaNames.get(areaId) || areaId,
+              entityIds: devices.flatMap((device) => device.entityIds),
+              devices,
+            };
+          });
 
         return {
           key,
           label: this._deviceTypeName(key),
           icon: this._deviceTypeIcon(key),
           color: this._deviceTypeColor(key),
-          devices,
+          entityIds: areas.length ? areas.flatMap((area) => area.entityIds) : typeEntries.map((entry) => entry.entityId),
           areas,
         };
       })
-      .filter((group) => group.devices.length > 0)
       .sort((a, b) => collator.compare(a.label, b.label));
-  }
+  });
 
   private _getAllDevicesById(): Map<string, DeviceConfig> {
     const devices = new Map<string, DeviceConfig>();
@@ -3228,36 +3454,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     return devices;
   }
 
-  private _isDeviceManagedEntity(entityId: string): boolean {
-    const registry = getEntityRegistry(this.hass)[entityId];
-    if (registry?.hidden_by || registry?.entity_category === "diagnostic" || registry?.entity_category === "config") {
-      return false;
-    }
-    return !!entityId.includes(".");
-  }
-
-  private _deviceVisibilityArea(device: DeviceConfig, entityIds: string[]): { areaId: string; areaName: string } | undefined {
-    const registryDevice = this.hass?.devices?.[device.device_id];
-    const hiddenAreas = new Set(this._config?.areas_display?.hidden || []);
-
-    const resolveArea = (areaId?: string | null) => {
-      if (!areaId || hiddenAreas.has(areaId)) return undefined;
-      const area = this._config?.areas?.find((item) => item.area_id === areaId);
-      return area ? { areaId: area.area_id, areaName: area.name } : undefined;
-    };
-
-    const fromDevice = resolveArea(device.area_id || registryDevice?.area_id);
-    if (fromDevice) return fromDevice;
-
-    for (const entityId of entityIds) {
-      const configEntity = this._config?.entities?.find((entity) => entity.entity_id === entityId);
-      const fromEntity = resolveArea(configEntity?.area_id || getEntityRegistry(this.hass)[entityId]?.area_id);
-      if (fromEntity) return fromEntity;
-    }
-
-    return undefined;
-  }
-
   private _getHiddenDeviceIds(): Set<string> {
     return new Set(
       (this._config?.device_admission?.hidden_devices || [])
@@ -3266,104 +3462,29 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _setDeviceHidden(deviceId: string, hidden: boolean): void {
-    this._setDevicesHidden([deviceId], hidden);
-  }
-
-  private _setDevicesHidden(deviceIds: string[], hidden: boolean): void {
     if (!this._config) return;
 
     const nextHidden = this._getHiddenDeviceIds();
-    deviceIds.forEach((deviceId) => {
-      if (!deviceId) return;
-      if (hidden) {
-        nextHidden.add(deviceId);
-      } else {
-        nextHidden.delete(deviceId);
-      }
-    });
+    if (hidden) nextHidden.add(deviceId);
+    else nextHidden.delete(deviceId);
 
-    const newConfig: DwainsDashboardConfig = {
+    this._fireConfigChanged({
       ...this._config,
       device_admission: {
         ...this._config.device_admission,
         hidden_devices: [...nextHidden].sort(),
       },
-    };
-
-    this._fireConfigChanged(newConfig);
-  }
-
-  private _uniqueDeviceIds(devices: DeviceVisibilityDevice[]): string[] {
-    return [...new Set(devices.map((device) => device.deviceId))];
-  }
-
-  private _uniqueDeviceIdsFromGroups(groups: DeviceVisibilityTypeGroup[]): string[] {
-    return [...new Set(groups.flatMap((group) => group.devices.map((device) => device.deviceId)))];
+    });
   }
 
   private _getDeviceTypeOptions(): Array<{ key: string; label: string; icon: string; color: string; count: number }> {
-    if (!this.hass || !this._config) return [];
-
-    const counts = new Map<string, number>();
-    const processed = new Set<string>();
-    const hiddenAreas = new Set(this._config.areas_display?.hidden || []);
-    const deviceAreas = new Map((this._config.devices || []).map((device) => [device.device_id, device.area_id]));
-
-    const addEntity = (entityId: string, areaId?: string | null, deviceId?: string | null) => {
-      if (!entityId || processed.has(entityId)) return;
-      const registry = getEntityRegistry(this.hass)[entityId];
-      if (registry?.hidden_by || registry?.entity_category === 'diagnostic' || registry?.entity_category === 'config') return;
-
-      const resolvedAreaId = areaId || (deviceId ? deviceAreas.get(deviceId) : undefined) || registry?.area_id;
-      if (!resolvedAreaId || hiddenAreas.has(resolvedAreaId)) return;
-      if (this._isEntityHiddenInAreaOptions(resolvedAreaId, entityId)) return;
-
-      const state = this.hass?.states?.[entityId];
-      if (this._config?.settings?.hide_unavailable_entities_on_devices !== false &&
-          (!state || isHiddenAsUnavailable(state))) {
-        return;
-      }
-
-      const key = this._deviceTypeKeyForEntityId(entityId);
-      if (!key) return;
-
-      processed.add(entityId);
-      counts.set(key, (counts.get(key) || 0) + 1);
-    };
-
-    (this._config.entities || []).forEach((entity) => addEntity(entity.entity_id, entity.area_id, entity.device_id));
-
-    Object.values(this.hass.states || {}).forEach((state: any) => {
-      addEntity(state.entity_id, state.attributes?.area_id, getEntityRegistry(this.hass)[state.entity_id]?.device_id);
-    });
-
-    const hiddenPersons = new Set(this._config.settings?.hidden_persons || []);
-    Object.values(this.hass.states || {}).forEach((state: any) => {
-      const entityId = state.entity_id;
-      if (!entityId?.startsWith('person.') || processed.has(entityId) || hiddenPersons.has(entityId)) return;
-      if (getEntityRegistry(this.hass)[entityId]?.hidden_by) return;
-      processed.add(entityId);
-      counts.set('person', (counts.get('person') || 0) + 1);
-    });
-
-    return [...counts.entries()]
-      .map(([key, count]) => ({
-        key,
-        label: this._deviceTypeName(key),
-        icon: this._deviceTypeIcon(key),
-        color: this._deviceTypeColor(key),
-        count,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }
-
-  private _isEntityHiddenInAreaOptions(areaId: string, entityId: string): boolean {
-    const areaOptions = this._config?.areas_options?.[areaId];
-    if (!areaOptions?.groups_options) return false;
-
-    return Object.values(areaOptions.groups_options).some((groupOptions) =>
-      groupOptions.hidden?.includes(entityId)
-    );
+    return this._getDeviceVisibilityTree().map((type) => ({
+      key: type.key,
+      label: type.label,
+      icon: type.icon,
+      color: type.color,
+      count: type.entityIds.length,
+    }));
   }
 
   private _deviceTypeKeyForEntityId(entityId: string): string | undefined {
@@ -3584,8 +3705,40 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     return grouped;
   }
 
+  /** The order to show: the drag preview of this list, else the stored order. */
+  private _previewOrder<T extends string>(list: string, order: readonly T[]): T[] {
+    const preview = this._dragPreview;
+    if (preview?.list === list && sameItems(preview.order, order)) return [...preview.order] as T[];
+    return [...order];
+  }
+
+  private _startDragPreview(list: string, order: readonly string[]): void {
+    this._dragPreview = { list, order: [...order] };
+  }
+
+  private _moveDragPreview(list: string, item: string | undefined, index: number): void {
+    const preview = this._dragPreview;
+    if (!item || !preview || preview.list !== list) return;
+    const next = moveItemTo(preview.order, item, index);
+    if (next !== preview.order) this._dragPreview = { list, order: next };
+  }
+
+  /** Ends the drag preview; returns its order when it differs from the stored order. */
+  private _finishDragPreview(list: string, stored: readonly string[]): string[] | undefined {
+    const preview = this._dragPreview;
+    if (preview?.list !== list) return undefined;
+    this._dragPreview = undefined;
+    if (!sameItems(preview.order, stored) || sameOrder(preview.order, stored)) return undefined;
+    return [...preview.order];
+  }
+
+  private _cancelDragPreview(list: string): void {
+    if (this._dragPreview?.list === list) this._dragPreview = undefined;
+  }
+
   private _handleHomeSectionDragStart(e: DragEvent, section: HomeSectionKey): void {
     this._draggedHomeSection = section;
+    this._startDragPreview('home-sections', this._getHomeSectionsOrder());
 
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
@@ -3596,11 +3749,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeSectionDragEnd = (): void => {
     this._draggedHomeSection = undefined;
     this._dragOverHomeSectionIndex = undefined;
+    this._cancelDragPreview('home-sections');
   };
 
   private _handleHomeSectionDragOver(e: DragEvent, index: number): void {
     e.preventDefault();
     this._dragOverHomeSectionIndex = index;
+    this._moveDragPreview('home-sections', this._draggedHomeSection, index);
 
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "move";
@@ -3622,23 +3777,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const dragged = this._draggedHomeSection;
     if (!dragged) return;
 
-    const order = this._getHomeSectionsOrder();
-    const draggedIndex = order.indexOf(dragged);
-
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._handleHomeSectionDragEnd();
-      return;
-    }
-
-    const next = [...order];
-    const [item] = next.splice(draggedIndex, 1);
-    next.splice(dropIndex, 0, item!);
-    this._setHomeSectionsOrder(next);
+    this._moveDragPreview('home-sections', dragged, dropIndex);
+    const next = this._finishDragPreview('home-sections', this._getHomeSectionsOrder());
+    if (next) this._setHomeSectionsOrder(next as HomeSectionKey[]);
     this._handleHomeSectionDragEnd();
   }
 
   private _handleHomeCameraDragStart(event: DragEvent, entityId: string): void {
     this._draggedHomeCamera = entityId;
+    this._startDragPreview('home-cameras', this._getHomeCameraSettings().map(camera => camera.entityId));
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', entityId);
@@ -3648,11 +3795,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleHomeCameraDragEnd = (): void => {
     this._draggedHomeCamera = undefined;
     this._dragOverHomeCameraIndex = undefined;
+    this._cancelDragPreview('home-cameras');
   };
 
   private _handleHomeCameraDragOver(event: DragEvent, index: number): void {
     event.preventDefault();
     this._dragOverHomeCameraIndex = index;
+    this._moveDragPreview('home-cameras', this._draggedHomeCamera, index);
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
   }
 
@@ -3667,18 +3816,56 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     const dragged = this._draggedHomeCamera;
     if (!dragged) return;
 
-    const order = this._getHomeCameraSettings().map(camera => camera.entityId);
-    const draggedIndex = order.indexOf(dragged);
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._handleHomeCameraDragEnd();
-      return;
-    }
-
-    const [camera] = order.splice(draggedIndex, 1);
-    order.splice(dropIndex, 0, camera!);
-    this._setHomeCameraOrder(order);
+    this._moveDragPreview('home-cameras', dragged, dropIndex);
+    const next = this._finishDragPreview('home-cameras', this._getHomeCameraSettings().map(camera => camera.entityId));
+    if (next) this._setHomeCameraOrder(next);
     this._handleHomeCameraDragEnd();
   }
+
+  /** Asks before a reset that throws away choices made in the settings. */
+  private _confirmReset(title: string, message: string): Promise<boolean> {
+    return showConfirmDialog(this, {
+      hass: this.hass,
+      title,
+      message,
+      confirmLabel: this._t('settings.reset'),
+      destructive: true,
+    });
+  }
+
+  private _resetAreasConfiguration = async (): Promise<void> => {
+    if (!this._config || isAreasDisplayDefault(this._config.areas_display)) return;
+    if (!await this._confirmReset(this._t('settings.reset_area_list_confirm'), this._t('settings.reset_area_list_message'))) return;
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      areas_display: resetAreasDisplay(this._config.areas_display),
+    });
+  };
+
+  private _resetAreaLayout = async (): Promise<void> => {
+    const areaId = this._area;
+    if (!this._config || !areaId || isAreaLayoutDefault(this._config.areas_options?.[areaId])) return;
+    if (!await this._confirmReset(this._t('settings.reset_room_layout_confirm'), this._t('settings.reset_room_layout_message'))) return;
+    if (!this._config || this._area !== areaId) return;
+    this._fireConfigChanged({
+      ...this._config,
+      areas_options: {
+        ...this._config.areas_options,
+        [areaId]: resetAreaLayout(this._config.areas_options?.[areaId]),
+      },
+    });
+  };
+
+  private _resetDeviceVisibility = async (): Promise<void> => {
+    if (!this._config || isDeviceVisibilityDefault(this._config.settings, this._config.device_admission)) return;
+    if (!await this._confirmReset(this._t('settings.reset_devices_visibility_confirm'), this._t('settings.reset_devices_visibility_message'))) return;
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      ...resetDeviceVisibility(this._config.settings, this._config.device_admission),
+    });
+  };
 
   private _setAreaSortMode(sortMode: AreaSortMode): void {
     if (!this._config || !this.hass) return;
@@ -3699,8 +3886,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     });
   }
 
+  /** Area ids in the order of the area list, hidden areas included. */
+  private _sortedAreaIds(): string[] {
+    return sortAreas(
+      Object.values(this.hass?.areas || {}),
+      { ...this._config?.areas_display, hidden: [] },
+      ddLocale(this.hass)
+    ).map((area) => area.area_id);
+  }
+
   private _handleAreaDragStart(e: DragEvent, areaId: string): void {
     this._draggedAreaId = areaId;
+    this._startDragPreview('areas', this._sortedAreaIds());
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', areaId);
@@ -3710,6 +3907,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleAreaDragEnd(): void {
     this._draggedAreaId = undefined;
     this._dragOverIndex = undefined;
+    this._cancelDragPreview('areas');
   }
 
   private _handleAreaDragOver(e: DragEvent, index: number): void {
@@ -3718,6 +3916,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       e.dataTransfer.dropEffect = 'move';
     }
     this._dragOverIndex = index;
+    this._moveDragPreview('areas', this._draggedAreaId, index);
   }
 
   private _handleAreaDragLeave(e: DragEvent): void {
@@ -3736,43 +3935,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       resolveAreaSortMode(this._config.areas_display) !== 'custom'
     ) return;
 
-    const areas = Object.values(this.hass!.areas || {});
-    const sortedAreas = sortAreas(
-      areas,
-      { ...this._config.areas_display, hidden: [] },
-      ddLocale(this.hass)
-    );
+    this._moveDragPreview('areas', this._draggedAreaId, dropIndex);
+    const order = this._finishDragPreview('areas', this._sortedAreaIds());
+    this._handleAreaDragEnd();
+    if (!order) return;
 
-    // Find the dragged item's current index
-    const draggedIndex = sortedAreas.findIndex(area => area.area_id === this._draggedAreaId);
-
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._draggedAreaId = undefined;
-      this._dragOverIndex = undefined;
-      return;
-    }
-
-    // Reorder the areas
-    const newSortedAreas = [...sortedAreas];
-    const [removed] = newSortedAreas.splice(draggedIndex, 1);
-    if (!removed) return;
-
-    newSortedAreas.splice(dropIndex, 0, removed);
-
-    // Create new order array
-    const order = newSortedAreas.map(area => area.area_id);
-
-    const newConfig: DwainsDashboardConfig = {
-      ...this._config!,
+    this._fireConfigChanged({
+      ...this._config,
       areas_display: {
-        ...this._config!.areas_display,
-        order
-      }
-    };
-
-    this._fireConfigChanged(newConfig);
-    this._draggedAreaId = undefined;
-    this._dragOverIndex = undefined;
+        ...this._config.areas_display,
+        order,
+      },
+    });
   }
 
   private _moveArea(areaId: string, direction: -1 | 1): void {
@@ -3937,24 +4111,62 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         },
       },
     });
+    this._areaGroupOrderChanged = true;
   }
 
-  private _handleEntitySectionDragStart(event: DragEvent, group: AreaStrategyGroup): void {
+  /** Copies the group order of this room to every room. */
+  private _applyAreaGroupOrderToAllAreas = async (): Promise<void> => {
+    const areaId = this._area;
+    if (!this._config || !areaId || !this._areaGroupOrderChanged) return;
+    const confirmed = await showConfirmDialog(this, {
+      hass: this.hass,
+      title: this._t('settings.apply_group_order_all_confirm'),
+      message: this._t('settings.apply_group_order_all_description'),
+      confirmLabel: this._t('common.apply'),
+    });
+    if (!confirmed || !this._config || this._area !== areaId) return;
+
+    const currentOrder = this._config.areas_options?.[areaId]?.group_order;
+    const order = currentOrder?.length ? [...currentOrder] : [...AREA_STRATEGY_GROUPS];
+    const areasOptions = { ...this._config.areas_options };
+    const areaIds = new Set([
+      ...(this._config.areas || []).map((area) => area.area_id),
+      ...Object.keys(this.hass?.areas || {}),
+    ]);
+    areaIds.forEach((id) => {
+      areasOptions[id] = { ...areasOptions[id], group_order: [...order] };
+    });
+
+    this._fireConfigChanged({ ...this._config, areas_options: areasOptions });
+    this._areaGroupOrderChanged = false;
+    this._showToast(this._t('settings.apply_group_order_all_done'));
+  };
+
+  private _handleEntitySectionDragStart(
+    event: DragEvent,
+    group: AreaStrategyGroup,
+    orderedGroups: AreaStrategyGroup[]
+  ): void {
     event.stopPropagation();
     this._handleEntityDragEnd();
     this._handleAreaCustomCardDragEnd();
     this._draggedEntitySection = group;
     this._dragOverEntitySection = undefined;
+    this._startDragPreview(`area-groups:${this._area}`, orderedGroups);
     event.dataTransfer?.setData('text/plain', group);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
   }
 
   private _handleEntitySectionDragOver(event: DragEvent, group: AreaStrategyGroup): void {
-    if (!this._draggedEntitySection) return;
+    const dragged = this._draggedEntitySection;
+    if (!dragged) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     this._dragOverEntitySection = group;
+    const list = `area-groups:${this._area}`;
+    const index = this._dragPreview?.list === list ? this._dragPreview.order.indexOf(group) : -1;
+    if (index >= 0) this._moveDragPreview(list, dragged, index);
   }
 
   private _handleEntitySectionDrop(
@@ -3967,14 +4179,9 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     event.preventDefault();
     event.stopPropagation();
 
-    const fromIndex = orderedGroups.indexOf(draggedGroup);
-    const targetIndex = orderedGroups.indexOf(targetGroup);
-    if (fromIndex >= 0 && targetIndex >= 0 && fromIndex !== targetIndex) {
-      const reordered = [...orderedGroups];
-      const [moved] = reordered.splice(fromIndex, 1);
-      if (moved) reordered.splice(targetIndex, 0, moved);
-      this._saveEntitySectionOrder(reordered);
-    }
+    this._handleEntitySectionDragOver(event, targetGroup);
+    const reordered = this._finishDragPreview(`area-groups:${this._area}`, orderedGroups);
+    if (reordered) this._saveEntitySectionOrder(reordered as AreaStrategyGroup[]);
     this._handleEntitySectionDragEnd();
   }
 
@@ -3998,6 +4205,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _handleEntitySectionDragEnd = (): void => {
     this._draggedEntitySection = undefined;
     this._dragOverEntitySection = undefined;
+    this._cancelDragPreview(`area-groups:${this._area}`);
   };
 
   private _handleAreaEditorDragOver(event: DragEvent, group: string, index: number): void {
@@ -4022,10 +4230,46 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     this._handleEntityDrop(event, group, index);
   }
 
+  /** Drag preview list of the entities of a group (or the free order) in this room. */
+  private _entityDragList(group: string): string {
+    return `entities:${this._area}:${group}`;
+  }
+
+  /** Entities of the room settings as listed: config entities plus states with this area in the registry. */
+  private _areaEditorEntities(areaId: string): { entity_id: string }[] {
+    const entities = this._configAreaEntities(areaId);
+    const seen = new Set(entities.map((entity) => entity.entity_id));
+    const registry = getEntityRegistry(this.hass);
+    Object.values(this.hass?.states || {}).forEach((state) => {
+      if (!seen.has(state.entity_id) && registry[state.entity_id]?.area_id === areaId) {
+        entities.push({ entity_id: state.entity_id });
+      }
+    });
+    return entities;
+  }
+
+  /** Stored order of the entities of a group, or of all entities in the free order. */
+  private _sortedGroupEntities(group: string): string[] {
+    if (!this._area || !this.hass) return [];
+    const groups = this._getAreaGroupedEntitiesWithoutFiltering(this._areaEditorEntities(this._area), this.hass);
+    const areaOptions = this._config?.areas_options?.[this._area];
+    if (group === UNGROUPED_ENTITY_DRAG_GROUP) {
+      return this._sortEntityIds(
+        AREA_STRATEGY_GROUPS.flatMap((groupKey) => groups[groupKey] || []),
+        areaOptions?.entity_order || []
+      );
+    }
+    return this._sortEntityIds(
+      groups[group as AreaStrategyGroup] || [],
+      areaOptions?.groups_options?.[group]?.order || []
+    );
+  }
+
   private _handleEntityDragStart(e: DragEvent, entityId: string, group: string): void {
     this._handleAreaCustomCardDragEnd();
     this._draggedEntityId = entityId;
     this._draggedEntityGroup = group;
+    this._startDragPreview(this._entityDragList(group), this._sortedGroupEntities(group));
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', entityId);
@@ -4033,6 +4277,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _handleEntityDragEnd(): void {
+    if (this._draggedEntityGroup) this._cancelDragPreview(this._entityDragList(this._draggedEntityGroup));
     this._draggedEntityId = undefined;
     this._draggedEntityGroup = undefined;
     this._dragOverEntityIndex = undefined;
@@ -4045,6 +4290,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     }
     if (this._draggedEntityGroup === group) {
       this._dragOverEntityIndex = index;
+      this._moveDragPreview(this._entityDragList(group), this._draggedEntityId, index);
     }
   }
 
@@ -4060,82 +4306,35 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
     if (!this._draggedEntityId || !this._config || !this._area || this._draggedEntityGroup !== group) return;
 
-    // Get entities for this group
-    const areaEntities = this._configAreaEntities(this._area);
+    const list = this._entityDragList(group);
+    this._moveDragPreview(list, this._draggedEntityId, dropIndex);
+    const order = this._finishDragPreview(list, this._sortedGroupEntities(group));
+    this._handleEntityDragEnd();
+    if (!order) return;
 
-    // Get grouped entities
-    const groups = this._getAreaGroupedEntitiesWithoutFiltering(areaEntities, this.hass!);
-    const isUngrouped = group === UNGROUPED_ENTITY_DRAG_GROUP;
-    const allGroupEntities = isUngrouped
-      ? AREA_STRATEGY_GROUPS.flatMap((groupKey) => groups[groupKey] || [])
-      : groups[group as keyof typeof groups] || [];
-    const groupOptions = this._config.areas_options?.[this._area]?.groups_options?.[group];
-    const entityOrder = isUngrouped
-      ? this._config.areas_options?.[this._area]?.entity_order || []
-      : groupOptions?.order || [];
-
-    // Sort entities according to current order
-    const sortedEntities = [...allGroupEntities].sort((a, b) => {
-      const aIndex = entityOrder.indexOf(a);
-      const bIndex = entityOrder.indexOf(b);
-      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-      if (aIndex !== -1) return -1;
-      if (bIndex !== -1) return 1;
-      const nameA = this.hass!.states[a]?.attributes?.friendly_name || a;
-      const nameB = this.hass!.states[b]?.attributes?.friendly_name || b;
-      return nameA.localeCompare(nameB);
-    });
-
-    // Find the dragged item's current index
-    const draggedIndex = sortedEntities.findIndex(entityId => entityId === this._draggedEntityId);
-
-    if (draggedIndex === -1 || draggedIndex === dropIndex) {
-      this._draggedEntityId = undefined;
-      this._draggedEntityGroup = undefined;
-      this._dragOverEntityIndex = undefined;
-      return;
-    }
-
-    // Reorder the entities
-    const newSortedEntities = [...sortedEntities];
-    const [removed] = newSortedEntities.splice(draggedIndex, 1);
-    if (!removed) return;
-
-    newSortedEntities.splice(dropIndex, 0, removed);
-
-    // Create new order array
-    const order = newSortedEntities;
-
-    if (isUngrouped) {
+    if (group === UNGROUPED_ENTITY_DRAG_GROUP) {
       this._saveUngroupedEntityOrder(order);
-      this._handleEntityDragEnd();
       return;
     }
 
-    const newConfig: DwainsDashboardConfig = {
-      ...this._config!,
+    const areaOptions = this._config.areas_options?.[this._area];
+    this._fireConfigChanged({
+      ...this._config,
       areas_options: {
-        ...this._config!.areas_options,
+        ...this._config.areas_options,
         [this._area]: {
-          ...this._config!.areas_options?.[this._area],
+          ...areaOptions,
           groups_options: {
-            ...this._config!.areas_options?.[this._area]?.groups_options,
+            ...areaOptions?.groups_options,
             [group]: {
-              ...this._config!.areas_options?.[this._area]?.groups_options?.[group],
-              order
-            }
-          }
-        }
-      }
-    };
-
-    this._fireConfigChanged(newConfig);
-    this._draggedEntityId = undefined;
-    this._draggedEntityGroup = undefined;
-    this._dragOverEntityIndex = undefined;
+              ...areaOptions?.groups_options?.[group],
+              order,
+            },
+          },
+        },
+      },
+    });
   }
-
-
 
   private _toggleAreaVisibility(area: string): void {
     const hidden = [...(this._config!.areas_display?.hidden || [])];
@@ -4191,6 +4390,70 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   private _editArea(area: string): void {
     this._area = area;
+    this._collapsedAreaGroups = new Set();
+    this._areaGroupOrderChanged = false;
+  }
+
+  private _handleAreaGroupExpandedChanged(event: CustomEvent<{ expanded: boolean }>, group: string): void {
+    if (event.target !== event.currentTarget) return;
+    const collapsed = !event.detail?.expanded;
+    if (this._collapsedAreaGroups.has(group) === collapsed) return;
+    const next = new Set(this._collapsedAreaGroups);
+    if (collapsed) next.add(group);
+    else next.delete(group);
+    this._collapsedAreaGroups = next;
+  }
+
+  /**
+   * Hides or shows a whole entity group of the room. Hiding stores the
+   * entities the group has now, so entities added later are still shown.
+   */
+  private _setAreaEntityGroupHidden(group: string, entityIds: string[], hidden: boolean): void {
+    if (!this._config || !this._area) return;
+    const areaOptions = this._config.areas_options?.[this._area];
+    const groupOptions = areaOptions?.groups_options?.[group];
+
+    this._fireConfigChanged({
+      ...this._config,
+      areas_options: {
+        ...this._config.areas_options,
+        [this._area]: {
+          ...areaOptions,
+          groups_options: {
+            ...areaOptions?.groups_options,
+            [group]: {
+              ...groupOptions,
+              hidden: groupHiddenIds(groupOptions?.hidden, entityIds, hidden),
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private _visibilityIcon(visibility: GroupVisibility): string {
+    if (visibility === 'hidden') return 'mdi:eye-off-outline';
+    return visibility === 'partial' ? 'mdi:eye-minus-outline' : 'mdi:eye-outline';
+  }
+
+  /** Eye button of a group: shows whether it is visible, partly hidden or hidden. */
+  private _renderVisibilityButton(visibility: GroupVisibility, label: string, onClick: () => void) {
+    return html`
+      <button
+        class="visibility-button is-${visibility}"
+        type="button"
+        title=${label}
+        aria-label=${label}
+        aria-pressed=${visibility === 'hidden' ? 'false' : 'true'}
+        @click=${(event: Event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        @keydown=${(event: KeyboardEvent) => event.stopPropagation()}
+      >
+        <ha-icon icon=${this._visibilityIcon(visibility)}></ha-icon>
+      </button>
+    `;
   }
 
   private _addFavoriteEntity(): void {
@@ -4553,11 +4816,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _selectAlarmEntity(entityId: string): void {
+    const settings = this._config!.settings;
     const newConfig: DwainsDashboardConfig = {
       ...this._config!,
       settings: {
-        ...this._config!.settings,
-        alarm_entity_id: entityId
+        ...settings,
+        alarm_entity_id: entityId,
+        // Picking an alarm after it was removed shows the chip again.
+        show_alarm: settings?.alarm_entity_id ? settings.show_alarm : true,
       }
     };
 
@@ -4582,12 +4848,24 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       ...this._config!,
       settings: {
         ...this._config!.settings,
-        alarm_entity_id: undefined
+        alarm_entity_id: undefined,
+        show_alarm: false,
       }
     };
 
     this._fireConfigChanged(newConfig);
   }
+
+  private _toggleAlarmDisplay = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      settings: {
+        ...this._config.settings,
+        show_alarm: Boolean((e.target as any).checked),
+      },
+    });
+  };
 
   private _toggleTimeDisplay(e: Event): void {
     const target = e.target as any;
@@ -4698,17 +4976,38 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
-  private _setNowPlayingMode(mode: NowPlayingMode): void {
-    const newConfig: DwainsDashboardConfig = {
-      ...this._config!,
+  private _toggleHideAreaName = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
       settings: {
-        ...this._config!.settings,
-        now_playing_bar: mode
-      }
-    };
+        ...this._config.settings,
+        hide_area_name_in_entity_names: Boolean((e.target as any).checked),
+      },
+    });
+  };
 
-    this._fireConfigChanged(newConfig);
-  }
+  private _toggleAreaFavorites = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      settings: {
+        ...this._config.settings,
+        show_area_favorites: Boolean((e.target as any).checked),
+      },
+    });
+  };
+
+  private _toggleAreaNowPlaying = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      settings: {
+        ...this._config.settings,
+        show_area_now_playing: Boolean((e.target as any).checked),
+      },
+    });
+  };
 
   private _toggleAreaThermostat(e: Event): void {
     const target = e.target as any;
@@ -5542,6 +5841,27 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         cursor: pointer;
       }
 
+      .home-layout-reset:disabled {
+        opacity: 0.42;
+        cursor: default;
+      }
+
+      .home-layout-reset:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+      }
+
+      .settings-reset-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 16px 0 0;
+      }
+
+      .area-editor-reset-row {
+        margin: 16px;
+      }
+
       @media (max-width: 600px) {
         .home-section-item {
           grid-template-columns: 28px 36px minmax(0, 1fr);
@@ -5785,6 +6105,53 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         flex: 1;
       }
 
+      .area-entity-section-title small {
+        margin-left: 8px;
+        color: var(--secondary-text-color);
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .area-entity-section.is-hidden ha-expansion-panel {
+        opacity: 0.62;
+      }
+
+      .visibility-button {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 auto;
+        border: 0;
+        border-radius: 999px;
+        color: var(--secondary-text-color);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .visibility-button:hover {
+        background: color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+        color: var(--primary-text-color);
+      }
+
+      .visibility-button:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 1px;
+      }
+
+      .visibility-button.is-partial {
+        color: var(--primary-color);
+      }
+
+      .visibility-button.is-hidden {
+        color: var(--disabled-text-color, var(--secondary-text-color));
+      }
+
+      .visibility-button ha-icon {
+        --mdc-icon-size: 20px;
+      }
+
       .area-entity-section-actions {
         margin-left: auto;
         display: inline-flex;
@@ -5920,10 +6287,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
       .area-order-hint {
         margin: 12px 0 0;
-      }
-
-      .now-playing-settings {
-        padding: 0 16px 16px;
       }
 
       .area-entity-layout-settings {
@@ -6263,6 +6626,18 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         padding: 0;
       }
 
+      .manage-favorites-link {
+        display: inline;
+        margin-left: 4px;
+        font-weight: 600;
+        line-height: inherit;
+      }
+
+      .manage-favorites-link:hover,
+      .manage-favorites-link:focus-visible {
+        text-decoration: underline;
+      }
+
       ha-icon-button[disabled] {
         opacity: 0.5;
         pointer-events: none;
@@ -6445,6 +6820,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
       .time-toggle,
       .weather-toggle,
+      .alarm-toggle,
       .favorite-suggestions-toggle,
       .hide-unavailable-toggle {
         margin-bottom: 16px;
@@ -6452,6 +6828,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
       .time-toggle ha-formfield,
       .weather-toggle ha-formfield,
+      .alarm-toggle ha-formfield,
       .favorite-suggestions-toggle ha-formfield,
       .hide-unavailable-toggle ha-formfield {
         --mdc-typography-body2-font-size: 14px;
@@ -6466,14 +6843,8 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         border-left: 3px solid var(--divider-color);
       }
 
-      .device-types-visibility {
+      .device-visibility-section {
         margin-top: 20px;
-        display: grid;
-        gap: 12px;
-      }
-
-      .device-admission-section {
-        margin-top: 24px;
         display: grid;
         gap: 12px;
       }
@@ -6509,33 +6880,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         font-weight: 800;
       }
 
-      .device-types-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 8px;
-      }
-
-      .device-type-option {
-        display: grid;
-        grid-template-columns: 42px minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 10px;
-        padding: 10px;
-        border: 1px solid var(--divider-color);
-        border-radius: 10px;
-        background: var(--card-background-color);
-        transition: opacity 0.16s ease, border-color 0.16s ease, background 0.16s ease;
-      }
-
-      .device-type-option.enabled {
-        border-color: color-mix(in srgb, var(--device-type-color) 24%, var(--divider-color));
-      }
-
-      .device-type-option.disabled {
-        opacity: 0.58;
-        background: color-mix(in srgb, var(--card-background-color) 78%, var(--secondary-background-color));
-      }
-
       .device-type-icon {
         width: 42px;
         height: 42px;
@@ -6543,93 +6887,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         display: flex;
         align-items: center;
         justify-content: center;
+        flex: 0 0 auto;
         color: var(--device-type-color);
         background: color-mix(in srgb, var(--device-type-color) 13%, transparent);
       }
 
       .device-type-icon ha-icon {
         --mdc-icon-size: 22px;
-      }
-
-      .device-type-copy {
-        min-width: 0;
-      }
-
-      .device-type-name {
-        color: var(--primary-text-color);
-        font-size: 14px;
-        font-weight: 700;
-        line-height: 1.15;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .device-type-count {
-        margin-top: 3px;
-        color: var(--secondary-text-color);
-        font-size: 12px;
-        line-height: 1;
-      }
-
-      .device-admission-global-actions,
-      .device-admission-group-actions,
-      .device-admission-area-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .device-admission-global-actions button,
-      .device-admission-group-actions button,
-      .device-admission-area-actions button {
-        min-height: 34px;
-        border: 0;
-        border-radius: 999px;
-        padding: 0 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        color: var(--primary-color);
-        background: color-mix(in srgb, var(--primary-color) 10%, transparent);
-        font: inherit;
-        font-size: 12px;
-        font-weight: 800;
-        cursor: pointer;
-      }
-
-      .device-admission-global-actions button[disabled],
-      .device-admission-group-actions button[disabled],
-      .device-admission-area-actions button[disabled] {
-        opacity: 0.42;
-        cursor: not-allowed;
-      }
-
-      .device-admission-global-actions ha-icon {
-        --mdc-icon-size: 16px;
-      }
-
-      .device-admission-groups {
-        display: grid;
-        gap: 8px;
-      }
-
-      .device-admission-groups ha-expansion-panel,
-      .device-admission-area,
-      .device-admission-device {
-        content-visibility: auto;
-      }
-
-      .device-admission-groups ha-expansion-panel {
-        contain-intrinsic-size: auto 86px;
-      }
-
-      .device-admission-panel-header {
-        width: 100%;
-        display: grid;
-        grid-template-columns: 34px minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 10px;
       }
 
       .device-type-icon.small {
@@ -6642,88 +6906,178 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         --mdc-icon-size: 19px;
       }
 
-      .device-admission-panel-header > span:not(.device-type-icon) {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: var(--primary-text-color);
-        font-weight: 800;
-      }
-
-      .device-admission-panel-header small {
-        color: var(--secondary-text-color);
-        font-size: 12px;
-        font-weight: 700;
-      }
-
-      .device-admission-panel {
-        display: grid;
-        gap: 12px;
-        padding: 0 16px 16px;
-      }
-
-      .device-admission-group-actions {
-        justify-content: flex-end;
-      }
-
-      .device-admission-area {
+      /* Devices page visibility tree: type > area > device > entity. */
+      .device-visibility-tree {
         display: grid;
         gap: 8px;
-        padding: 12px;
+      }
+
+      .device-visibility-type {
         border: 1px solid var(--divider-color);
         border-radius: 12px;
-        background: color-mix(in srgb, var(--card-background-color) 82%, var(--secondary-background-color));
-        contain-intrinsic-size: auto 180px;
+        background: var(--card-background-color);
+        content-visibility: auto;
+        contain-intrinsic-size: auto 58px;
       }
 
-      .device-admission-area-header {
+      .device-visibility-type.open {
+        border-color: color-mix(in srgb, var(--device-type-color) 30%, var(--divider-color));
+      }
+
+      .device-visibility-type-row {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 12px;
+        gap: 4px;
+        padding: 6px 8px 6px 6px;
       }
 
-      .device-admission-area-header strong {
-        display: block;
+      .device-visibility-type-toggle {
+        flex: 1;
+        min-width: 0;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 6px;
+        border: 0;
+        border-radius: 10px;
+        color: inherit;
+        background: transparent;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .device-visibility-type-toggle:disabled {
+        cursor: default;
+      }
+
+      .device-visibility-type-toggle:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 1px;
+      }
+
+      .device-visibility-type.is-hidden .device-visibility-type-toggle {
+        opacity: 0.58;
+      }
+
+      .device-visibility-copy {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+
+      .device-visibility-copy strong {
+        overflow: hidden;
         color: var(--primary-text-color);
         font-size: 14px;
+        font-weight: 700;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .device-visibility-copy small {
+        color: var(--secondary-text-color);
+        font-size: 12px;
         line-height: 1.2;
       }
 
-      .device-admission-area-header span {
-        display: block;
-        margin-top: 2px;
+      .device-visibility-chevron {
+        flex: 0 0 auto;
         color: var(--secondary-text-color);
-        font-size: 12px;
+        transition: transform 0.18s ease;
+        --mdc-icon-size: 20px;
       }
 
-      .device-admission-device-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-        gap: 8px;
+      .device-visibility-type.open .device-visibility-chevron {
+        transform: rotate(180deg);
       }
 
-      .device-admission-device {
+      .device-visibility-areas {
         display: grid;
-        grid-template-columns: 42px minmax(0, 1fr) auto;
+        gap: 10px;
+        padding: 0 12px 12px;
+      }
+
+      .device-visibility-area {
+        display: grid;
+        gap: 6px;
+        padding: 8px 8px 10px 12px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--card-background-color) 82%, var(--secondary-background-color));
+      }
+
+      .device-visibility-area.type-hidden {
+        opacity: 0.58;
+      }
+
+      .device-visibility-area-header,
+      .device-visibility-device-row,
+      .device-visibility-entity {
+        display: flex;
         align-items: center;
         gap: 10px;
-        padding: 10px;
-        border: 1px solid color-mix(in srgb, var(--device-type-color) 22%, var(--divider-color));
-        border-radius: 10px;
-        background: var(--card-background-color);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-        contain-intrinsic-size: auto 64px;
-      }
-
-      .device-admission-device.hidden {
-        opacity: 0.58;
-        background: color-mix(in srgb, var(--card-background-color) 74%, var(--secondary-background-color));
-      }
-
-      .device-admission-copy {
         min-width: 0;
+      }
+
+      .device-visibility-device-row {
+        min-height: 40px;
+        padding-right: 2px;
+      }
+
+      .device-visibility-device-icon {
+        flex: 0 0 auto;
+        color: var(--secondary-text-color);
+        --mdc-icon-size: 20px;
+      }
+
+      .device-visibility-device.device-hidden .device-visibility-device-row .device-visibility-copy {
+        opacity: 0.62;
+      }
+
+      .device-visibility-entities {
+        display: grid;
+        gap: 2px;
+      }
+
+      .device-visibility-device-row + .device-visibility-entities {
+        margin-left: 15px;
+        padding-left: 15px;
+        border-left: 2px solid var(--divider-color);
+      }
+
+      .device-visibility-entity {
+        min-height: 36px;
+      }
+
+      .device-visibility-entity.is-hidden .device-visibility-entity-icon,
+      .device-visibility-entity.is-hidden .device-visibility-entity-name {
+        opacity: 0.5;
+      }
+
+      .device-visibility-entity-icon {
+        flex: 0 0 auto;
+        color: var(--device-type-color);
+        --mdc-icon-size: 20px;
+      }
+
+      .device-visibility-entity-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        color: var(--primary-text-color);
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .device-visibility-entity-note {
+        flex: 0 0 auto;
+        padding-right: 8px;
+        color: var(--secondary-text-color);
+        font-size: 12px;
       }
 
       @media (max-width: 600px) {
@@ -6733,21 +7087,19 @@ export class DwainsDashboardStrategyEditor extends LitElement {
           gap: 8px;
         }
 
-        .device-types-grid {
-          grid-template-columns: 1fr;
+        .device-visibility-areas {
+          padding: 0 8px 10px;
         }
 
-        .device-admission-panel {
-          padding: 0 10px 12px;
+        .device-visibility-device-row + .device-visibility-entities {
+          margin-left: 8px;
+          padding-left: 10px;
         }
+      }
 
-        .device-admission-area-header {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-
-        .device-admission-device-list {
-          grid-template-columns: 1fr;
+      @media (prefers-reduced-motion: reduce) {
+        .device-visibility-chevron {
+          transition: none;
         }
       }
 

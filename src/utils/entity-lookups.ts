@@ -69,6 +69,11 @@ export function getHiddenDeviceIdSet(config?: DwainsDashboardConfig | null): Rea
   return stringSetCache(config?.device_admission?.hidden_devices, EMPTY_SET);
 }
 
+/** Entities hidden on the Devices page only. Read only, shared between callers. */
+export function getDevicesPageHiddenEntityIdSet(config?: DwainsDashboardConfig | null): ReadonlySet<string> {
+  return stringSetCache(config?.device_admission?.hidden_entities, EMPTY_SET);
+}
+
 /** Areas hidden in the dashboard area settings. */
 export function getHiddenAreaIdSet(config?: DwainsDashboardConfig | null): ReadonlySet<string> {
   return stringSetCache(config?.areas_display?.hidden, EMPTY_SET);

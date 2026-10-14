@@ -10,12 +10,13 @@ import type {
 import { ddLocale, ddLocalize, ddLocalizePlural } from '../utils/localize';
 import { sortAreas } from '../utils/area-entities';
 import { isHiddenAsUnavailable } from '../utils/entity-availability';
-import { isConfigEntityInArea } from '../utils/entity-lookups';
+import { getDevicesPageHiddenEntityIdSet, isConfigEntityInArea } from '../utils/entity-lookups';
 import { updateStoredDashboardStrategy } from '../utils/dashboard-config-store';
 import { isNonAdminUser } from '../utils/security';
 import { getDomainIcon, getDeviceClassIcon, getDomainColor } from '../utils/icons';
 import { getDomainName, getDeviceClassName } from '../utils/domain-names';
-import { resolveEntityCardConfig } from '../utils/blueprint-replacements';
+import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
+import { areaEntityDisplayName } from '../utils/entity-names';
 import {
   NEW_DEVICE_WINDOW_HOURS,
   buildRecentDeviceSummaries,
@@ -48,6 +49,8 @@ const PERSON_DOMAIN = 'person';
 const PERSON_AREA_KEY = '__people__';
 // Delay before recording first seen devices, so a burst of renders saves once.
 const DEVICE_TRACKING_DELAY_MS = 500;
+/** Default card types that accept a `name` option. */
+const NAMED_DEFAULT_CARD_TYPES: ReadonlySet<string> = new Set(['tile', 'thermostat', 'picture-entity', 'sensor']);
 
 interface MaintenanceItem {
   entityId: string;
@@ -349,6 +352,12 @@ export class DwainsDevicesCard extends LitElement {
     }
 
     filteredEntities = filterHiddenDeviceEntities(this._hass, this.config, filteredEntities);
+
+    // Entities hidden for this page only in the Devices page settings.
+    const hiddenOnDevicesPage = getDevicesPageHiddenEntityIdSet(this.config);
+    if (hiddenOnDevicesPage.size) {
+      filteredEntities = filteredEntities.filter((entity) => !hiddenOnDevicesPage.has(entity.entity_id));
+    }
 
     return filteredEntities;
   }
@@ -771,17 +780,30 @@ export class DwainsDevicesCard extends LitElement {
     return true;
   }
 
-  private _entityCardConfig(entityId: string): any {
+  private _entityCardConfig(entityId: string, areaName?: string): any {
     if (entityId.startsWith('todo.')) {
       return { type: 'todo-list', entity: entityId };
     }
 
-    return resolveEntityCardConfig({
+    const params = {
       hass: this._hass,
       config: this.config,
       entity: entityId,
-      surface: 'devices_cards',
-    });
+      surface: 'devices_cards' as const,
+    };
+    const cardConfig = resolveEntityCardConfig(params);
+    // The area group already shows the area, so the default cards drop it from
+    // the entity name. Blueprint replacements keep their own naming.
+    if (!areaName || !NAMED_DEFAULT_CARD_TYPES.has(cardConfig.type) || cardConfig.name !== undefined) {
+      return cardConfig;
+    }
+    const assignment = findReplacementAssignment(params);
+    if (assignment && assignment.enabled !== false) return cardConfig;
+
+    const fullName = this._hass.states?.[entityId]?.attributes?.friendly_name;
+    if (typeof fullName !== 'string' || !fullName) return cardConfig;
+    const name = areaEntityDisplayName(fullName, areaName, this.config?.settings);
+    return name === fullName ? cardConfig : { ...cardConfig, name };
   }
 
   // ---- Selectie -------------------------------------------------------------
@@ -1151,7 +1173,7 @@ export class DwainsDevicesCard extends LitElement {
                 ${repeat(
                   bucket.entities,
                   (e) => e.entity_id,
-                  (entity) => this._renderEntityCard(entity)
+                  (entity) => this._renderEntityCard(entity, domain === PERSON_DOMAIN ? undefined : area.name)
                 )}
               </div>
             </div>
@@ -1282,7 +1304,7 @@ export class DwainsDevicesCard extends LitElement {
     window.dispatchEvent(ev);
   }
 
-  private _renderEntityCard(entity: EntityConfig) {
+  private _renderEntityCard(entity: EntityConfig, areaName?: string) {
     const state = this._hass.states[entity.entity_id];
     if (!state) return nothing;
 
@@ -1290,7 +1312,7 @@ export class DwainsDevicesCard extends LitElement {
       <div class="${this._entityWrapperClass(entity.entity_id)}">
         <dwains-dashboard-next-card-host
           .hass=${this._hass}
-          .config=${this._entityCardConfig(entity.entity_id)}
+          .config=${this._entityCardConfig(entity.entity_id, areaName)}
         ></dwains-dashboard-next-card-host>
       </div>
     `;

@@ -44,6 +44,14 @@ In `heat_cool` mode with a low and high target, or when the thermostat has no si
 
 Areas with several climate entities keep the climate quick control, which opens a list of all climate entities. The thermostat can be turned off in **Dashboard settings > Areas > Show thermostat in the room header**.
 
+## Favorites
+
+The favorites that belong to the area are shown as a **Favorites** group at the top of the page, above the other groups. Tap the heading to fold or unfold it; the choice is remembered on this device. Turn the group off in **Dashboard settings > Areas > Show favorites on room pages**, and pick favorites in **Dashboard settings > Favorites**.
+
+## Entity Names
+
+Entity tiles leave out the area name, so the Living room page shows "Ceiling light" instead of "Living room Ceiling light". The area name is removed at the start or the end of a name, also between brackets, but only as a whole word. Turn this off in **Dashboard settings > Areas > Leave the room name out of entity names**.
+
 ## Entity Groups
 
 Most entities are grouped by domain, for example Lights, Switches, Climate, Sensors, Scenes and To-do lists. Covers, binary sensors and alarms are grouped by what they do:

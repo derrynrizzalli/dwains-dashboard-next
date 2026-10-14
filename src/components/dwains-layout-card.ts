@@ -16,7 +16,7 @@ import { ManagedSubscription } from '../utils/managed-subscription';
 import { updateStoredDashboardStrategy } from '../utils/dashboard-config-store';
 import { formatClock, msUntilNextMinute } from '../utils/clock';
 import { isHiddenAsUnavailable, splitHiddenUnavailableEntities } from '../utils/entity-availability';
-import { getAreaConfigMap, getHiddenPersonIdSet, resolveStatusEntityAreaId } from '../utils/entity-lookups';
+import { getAreaConfigMap, getEntityConfigMap, getHiddenPersonIdSet, resolveStatusEntityAreaId } from '../utils/entity-lookups';
 import { getDomainStates } from '../utils/state-index';
 import {
   hasRelevantStateChange,
@@ -49,13 +49,13 @@ import {
   resolveAreaGroupEntityOrder,
   selectAreaCovers,
   sortAreas,
-  stripAreaFromEntityName,
   AREA_COVER_GROUPS,
   type AreaCoverGroup,
 } from '../utils/area-entities';
+import { areaEntityDisplayName } from '../utils/entity-names';
 import { navigateHomeAssistant } from '../utils/navigation';
 import { syncHassDarkThemeAttribute } from '../utils/theme';
-import { HOME_SECTION_META, normalizeHiddenHomeInformationCards, normalizeHiddenHomeSections, normalizeHomeSectionsOrder } from '../utils/home-sections';
+import { HOME_SECTION_META, normalizeHiddenHomeInformationCards, normalizeHomeSectionsOrder, resolveHiddenHomeSections } from '../utils/home-sections';
 import { buildHousePowerUsage } from '../utils/power-usage';
 import { normalizeHomeScenes, resolveHomeSceneItems, type HomeSceneItem } from '../utils/home-scenes';
 import { formatEntityStateWithUnit, formatValueWithUnit } from '../utils/unit-format';
@@ -87,7 +87,6 @@ import {
   isNowPlayingPlayerVisible,
   isNowPlayingRelevantStateChange,
   isNowPlayingShownOn,
-  normalizeNowPlayingMode,
   nowPlayingRoomName,
   pickNowPlayingEntityIds,
 } from '../utils/now-playing';
@@ -102,6 +101,7 @@ type PictureTextTone = 'light' | 'dark';
 type PictureContrastCacheValue = PictureTextTone | 'pending';
 const SIDEBAR_WIDTH_STORAGE_KEY = 'dd-next-area-sidebar-width';
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'dd-next-area-sidebar-collapsed';
+const AREA_FAVORITES_COLLAPSED_STORAGE_KEY = 'dd-next-area-favorites-collapsed';
 const AREA_EDIT_MODE_STORAGE_KEY = 'dd-next-area-edit-mode';
 const AREA_EDIT_MODE_RESTORE_MS = 30000;
 const OPTIMISTIC_ENTITY_STATE_TTL = 5000;
@@ -258,6 +258,7 @@ export class DwainsLayoutCard extends LitElement {
   @state() private _homeSceneAnnouncement = '';
   @state() private _areaSidebarWidth = SIDEBAR_DEFAULT_WIDTH;
   @state() private _areaSidebarCollapsed = false;
+  @state() private _areaFavoritesCollapsed = false;
   @state() private _isResizingSidebar = false;
   @state() private _repairsIssueCount = 0;
   @state() private _discoveredDeviceCount = 0;
@@ -536,6 +537,7 @@ export class DwainsLayoutCard extends LitElement {
     this._loadMobileEntityLayoutPreference();
     this._loadAreaSidebarWidthPreference();
     this._loadAreaSidebarCollapsedPreference();
+    this._loadAreaFavoritesCollapsedPreference();
     this._checkMobile();
     this._setupEventListeners();
     window.addEventListener('dwains-dashboard-next-toggle-area-nav', this._handleAreaNavToggle);
@@ -1002,6 +1004,23 @@ export class DwainsLayoutCard extends LitElement {
     }
   }
 
+  private _loadAreaFavoritesCollapsedPreference(): void {
+    try {
+      this._areaFavoritesCollapsed = window.localStorage.getItem(AREA_FAVORITES_COLLAPSED_STORAGE_KEY) === 'true';
+    } catch {
+      // Preference persistence is best-effort only.
+    }
+  }
+
+  private _toggleAreaFavoritesCollapsed = (): void => {
+    this._areaFavoritesCollapsed = !this._areaFavoritesCollapsed;
+    try {
+      window.localStorage.setItem(AREA_FAVORITES_COLLAPSED_STORAGE_KEY, this._areaFavoritesCollapsed ? 'true' : 'false');
+    } catch {
+      // Preference persistence is best-effort only.
+    }
+  };
+
   private _saveAreaSidebarCollapsedPreference(collapsed: boolean): void {
     try {
       window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? 'true' : 'false');
@@ -1407,7 +1426,7 @@ export class DwainsLayoutCard extends LitElement {
       ...normalizeHomeScenes(config.settings?.home_scenes),
     ]);
     if (config.settings?.weather_entity_id) ids.add(config.settings.weather_entity_id);
-    if (config.settings?.alarm_entity_id) ids.add(config.settings.alarm_entity_id);
+    if (config.settings?.alarm_entity_id && config.settings.show_alarm !== false) ids.add(config.settings.alarm_entity_id);
     const addSensor = (entityId: unknown) => {
       if (typeof entityId === 'string' && entityId) ids.add(entityId);
     };
@@ -1517,9 +1536,9 @@ export class DwainsLayoutCard extends LitElement {
     `;
   }
 
-  /** Whether the Now playing bar setting includes the current view. */
+  /** Whether the Now playing settings include the current view. */
   private _nowPlayingShown(): boolean {
-    return isNowPlayingShownOn(normalizeNowPlayingMode(this.config?.settings?.now_playing_bar), this._selectedView);
+    return isNowPlayingShownOn(this.config?.settings, this._selectedView);
   }
 
   /** Players for the Now playing bar on the current view, most relevant first. */
@@ -2263,7 +2282,6 @@ export class DwainsLayoutCard extends LitElement {
     return html`
       <div class="home-view">
         ${this._renderHomeWelcome()}
-        ${!this._isMobile ? this._renderNowPlayingBar(false) : nothing}
         ${sections.map(section => this._renderHomeSection(section))}
       </div>
     `;
@@ -2274,7 +2292,7 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _getVisibleHomeSections(): HomeSectionKey[] {
-    const hidden = new Set(normalizeHiddenHomeSections(this.config?.settings?.home_sections_hidden));
+    const hidden = new Set(resolveHiddenHomeSections(this.config?.settings));
     const forceAreas = this._isDesktopAreaSidebarCollapsed();
     return this._getHomeSectionsOrder().filter(section => !hidden.has(section) || (forceAreas && section === 'areas'));
   }
@@ -2286,6 +2304,9 @@ export class DwainsLayoutCard extends LitElement {
 
   private _renderHomeSection(section: HomeSectionKey) {
     switch (section) {
+      case 'now_playing':
+        // Phones float the bar above the bottom navigation instead.
+        return !this._isMobile ? this._renderNowPlayingBar(false) : nothing;
       case 'summaries':
         return this._renderHomeSummaries();
       case 'cameras':
@@ -3998,6 +4019,7 @@ export class DwainsLayoutCard extends LitElement {
         </header>
 
         ${!this._isMobile ? this._renderNowPlayingBar(false) : nothing}
+        ${this._renderAreaFavorites(area)}
         ${this._renderCustomCardSlot(area.area_id, 'top', this._t('layout.custom_cards_top'))}
         ${this._renderMobileEntitiesSection(area, areaEntities)}
         ${this._renderCustomCardSlot(area.area_id, 'bottom', this._t('layout.custom_cards_bottom'))}
@@ -4006,6 +4028,62 @@ export class DwainsLayoutCard extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  /** The dashboard favorites, manual and suggested, that belong to this room. */
+  private _getAreaFavoriteEntities(areaId: string): string[] {
+    if (this.config?.settings?.show_area_favorites === false) return [];
+    return this._getEffectiveFavoriteEntities().filter(entityId =>
+      resolveStatusEntityAreaId(this.hass, this.config, entityId) === areaId
+    );
+  }
+
+  /** Foldable group with the favorites of this room, above the generated groups. */
+  private _renderAreaFavorites(area: AreaConfig) {
+    if (this._editMode) return nothing;
+    const favorites = this._getAreaFavoriteEntities(area.area_id);
+    if (!favorites.length) return nothing;
+
+    const collapsed = this._areaFavoritesCollapsed;
+    const railId = `dd-area-favorites-${area.area_id}`;
+    return html`
+      <section class="mobile-entities-section area-favorites-section layout-${this._mobileEntityLayout}">
+        <div class="mobile-domain-group area-favorites-group ${collapsed ? 'is-collapsed' : ''}">
+          <div class="mobile-domain-header">
+            <button
+              class="area-favorites-toggle"
+              type="button"
+              aria-expanded=${collapsed ? 'false' : 'true'}
+              aria-controls=${railId}
+              title=${this._t(collapsed ? 'favorites.show_header' : 'favorites.hide_header')}
+              @click=${this._toggleAreaFavoritesCollapsed}
+            >
+              <span class="mobile-section-icon" aria-hidden="true">
+                <ha-icon icon="mdi:star"></ha-icon>
+              </span>
+              <span class="mobile-domain-title-copy">
+                <span class="mobile-domain-title-label">${this._t('favorites.title')}</span>
+                <span class="mobile-domain-count">(${this._tp('common.item', favorites.length)})</span>
+              </span>
+              <ha-icon class="area-favorites-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+            </button>
+          </div>
+          ${collapsed ? nothing : html`
+            <div class="mobile-entity-rail" id=${railId}>
+              ${repeat(
+                favorites,
+                entityId => entityId,
+                entityId => this._renderMobileEntityCard(area, this._favoriteEntityConfig(entityId))
+              )}
+            </div>
+          `}
+        </div>
+      </section>
+    `;
+  }
+
+  private _favoriteEntityConfig(entityId: string): EntityConfig {
+    return getEntityConfigMap(this.config).get(entityId) || { entity_id: entityId };
   }
 
   private _renderEmptyState(icon: string, title: string, text: string, actions: unknown = nothing) {
@@ -5685,9 +5763,9 @@ export class DwainsLayoutCard extends LitElement {
 
     const icon = getEntityRegistry(this.hass)[entity.entity_id]?.icon || state.attributes?.icon || getDeviceClassIcon(domain, deviceClass) || getDomainIcon(domain);
     const fullName = state.attributes?.friendly_name || getEntityRegistry(this.hass)[entity.entity_id]?.name || entity.entity_id;
-    // The page already shows the room, so drop a leading area name from the tile
-    // and use the second line for the device when that adds something.
-    const name = stripAreaFromEntityName(fullName, area.name);
+    // The page already shows the room, so drop the area name from the tile
+    // (unless turned off) and use the second line for the device when that adds something.
+    const name = areaEntityDisplayName(fullName, area.name, this.config?.settings);
     const deviceLabel = areaEntityDeviceLabel(name, this._entityDeviceName(entity.entity_id), area.name);
     const active = this._isEntityActiveForUi(state, domain);
     const actionKind = this._mobileEntityActionKind(domain);
@@ -6300,7 +6378,8 @@ export class DwainsLayoutCard extends LitElement {
 
   private _getAlarmEntity() {
     const configuredAlarmId = this.config?.settings?.alarm_entity_id;
-    if (!configuredAlarmId) {
+    // Hidden with the switch in the settings, without forgetting the entity.
+    if (!configuredAlarmId || this.config?.settings?.show_alarm === false) {
       return undefined;
     }
 

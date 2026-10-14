@@ -6,7 +6,9 @@ import {
   HOME_SECTION_META,
   normalizeHiddenHomeInformationCards,
   normalizeHiddenHomeSections,
+  isHomeSectionManaged,
   normalizeHomeSectionsOrder,
+  resolveHiddenHomeSections,
 } from '../src/utils/home-sections';
 import { hasDdTranslation } from '../src/utils/localize';
 
@@ -17,7 +19,7 @@ describe('normalizeHomeSectionsOrder', () => {
   });
 
   it('keeps a complete stored order', () => {
-    const order = ['favorites', 'scenes', 'summaries', 'areas', 'cameras', 'devices', 'todos', 'custom_cards'];
+    const order = ['favorites', 'scenes', 'now_playing', 'summaries', 'areas', 'cameras', 'devices', 'todos', 'custom_cards'];
     expect(normalizeHomeSectionsOrder(order)).toEqual(order);
   });
 
@@ -27,8 +29,10 @@ describe('normalizeHomeSectionsOrder', () => {
   });
 
   it('adds scenes to an order saved before scenes existed', () => {
-    // A customised order from an older version keeps its own order.
+    // A customised order from an older version keeps its own order. Now
+    // playing is new as well and its default place is first.
     expect(normalizeHomeSectionsOrder(['favorites', 'summaries', 'areas', 'cameras', 'devices', 'todos', 'custom_cards'])).toEqual([
+      'now_playing',
       'favorites',
       'scenes',
       'summaries',
@@ -40,6 +44,7 @@ describe('normalizeHomeSectionsOrder', () => {
     ]);
     // Summaries first: scenes is placed before the first later default section.
     expect(normalizeHomeSectionsOrder(['summaries', 'favorites', 'custom_cards', 'todos', 'devices', 'areas', 'cameras'])).toEqual([
+      'now_playing',
       'scenes',
       'summaries',
       'favorites',
@@ -52,11 +57,12 @@ describe('normalizeHomeSectionsOrder', () => {
   });
 
   it('keeps a stored scenes position', () => {
-    expect(normalizeHomeSectionsOrder(['scenes', 'cameras', 'areas', 'devices', 'todos', 'custom_cards', 'favorites', 'summaries'])[0]).toBe('scenes');
+    expect(normalizeHomeSectionsOrder(['scenes', 'cameras', 'areas', 'devices', 'todos', 'custom_cards', 'favorites', 'summaries', 'now_playing'])[0]).toBe('scenes');
   });
 
   it('drops unknown and duplicate sections', () => {
     expect(normalizeHomeSectionsOrder(['areas', 'weather', 'areas', 42, null, 'cameras'])).toEqual([
+      'now_playing',
       'areas',
       'cameras',
       'devices',
@@ -71,6 +77,7 @@ describe('normalizeHomeSectionsOrder', () => {
   it('inserts sections added in a newer version next to their default neighbours', () => {
     // An order saved before "todos" and "summaries" existed.
     expect(normalizeHomeSectionsOrder(['cameras', 'areas', 'devices', 'custom_cards', 'favorites'])).toEqual([
+      'now_playing',
       'cameras',
       'areas',
       'devices',
@@ -80,6 +87,47 @@ describe('normalizeHomeSectionsOrder', () => {
       'scenes',
       'summaries',
     ]);
+  });
+});
+
+describe('Now playing as a Home section', () => {
+  it('comes first in the default order', () => {
+    expect(DEFAULT_HOME_SECTIONS_ORDER[0]).toBe('now_playing');
+    expect(normalizeHomeSectionsOrder()[0]).toBe('now_playing');
+  });
+
+  it('is added first to an order saved before it existed', () => {
+    const order = normalizeHomeSectionsOrder(['favorites', 'cameras', 'areas', 'devices', 'todos', 'custom_cards', 'scenes', 'summaries']);
+    expect(order[0]).toBe('now_playing');
+    expect(order.slice(1)).toEqual(['favorites', 'cameras', 'areas', 'devices', 'todos', 'custom_cards', 'scenes', 'summaries']);
+  });
+
+  it('keeps a stored position', () => {
+    const order = normalizeHomeSectionsOrder(['cameras', 'areas', 'now_playing', 'devices']);
+    expect(order.indexOf('now_playing')).toBe(2);
+  });
+
+  it('knows when the section was saved', () => {
+    expect(isHomeSectionManaged(undefined, 'now_playing')).toBe(false);
+    expect(isHomeSectionManaged({ home_sections_order: ['cameras'] }, 'now_playing')).toBe(false);
+    expect(isHomeSectionManaged({ home_sections_order: ['now_playing'] }, 'now_playing')).toBe(true);
+    expect(isHomeSectionManaged({ home_sections_hidden: ['now_playing'] }, 'now_playing')).toBe(true);
+  });
+
+  it('follows the older now_playing_bar setting until it is managed', () => {
+    expect(resolveHiddenHomeSections({})).toEqual([]);
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'home' })).toEqual([]);
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'all' })).toEqual([]);
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'off' })).toEqual(['now_playing']);
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'off', home_sections_hidden: ['todos'] })).toEqual(['todos', 'now_playing']);
+    // An order saved by an older version does not manage Now playing yet.
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'off', home_sections_order: ['cameras', 'areas'] })).toEqual(['now_playing']);
+  });
+
+  it('ignores the older setting once the section is managed', () => {
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'off', home_sections_order: normalizeHomeSectionsOrder() })).toEqual([]);
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'home', home_sections_hidden: ['now_playing'] })).toEqual(['now_playing']);
+    expect(resolveHiddenHomeSections({ now_playing_bar: 'off', home_sections_hidden: ['now_playing'] })).toEqual(['now_playing']);
   });
 });
 

@@ -3230,6 +3230,66 @@ export const layoutCardStyles = css`
       display: none !important;
     }
 
+    /* Room favorites: a foldable group above the generated groups. */
+    .area-favorites-toggle {
+      appearance: none;
+      min-width: 0;
+      min-height: 32px;
+      margin: 0;
+      padding: 0 6px 0 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .area-favorites-toggle:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+
+    .area-favorites-chevron {
+      flex: 0 0 auto;
+      color: var(--secondary-text-color);
+      transition: transform 0.18s ease;
+      --mdc-icon-size: 20px;
+    }
+
+    .area-favorites-toggle:hover .area-favorites-chevron {
+      color: var(--primary-text-color);
+    }
+
+    .area-favorites-group.is-collapsed {
+      contain-intrinsic-size: auto 40px;
+    }
+
+    .area-favorites-group.is-collapsed .mobile-domain-header {
+      margin-bottom: 0;
+    }
+
+    .area-favorites-group.is-collapsed .area-favorites-chevron {
+      transform: rotate(-90deg);
+    }
+
+    /* Phones: the same space as between two groups of the room. */
+    @media (max-width: 768px) {
+      .area-view .area-favorites-section {
+        margin-bottom: 22px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .area-favorites-chevron {
+        transition: none;
+      }
+    }
+
     .mobile-domain-master {
       --mobile-domain-accent: var(--primary-color);
       min-width: 58px;

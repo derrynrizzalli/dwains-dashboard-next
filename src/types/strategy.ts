@@ -38,7 +38,7 @@ export interface LovelaceCardConfig {
   [key: string]: any;
 }
 
-export type HomeSectionKey = 'summaries' | 'cameras' | 'areas' | 'devices' | 'todos' | 'custom_cards' | 'favorites' | 'scenes';
+export type HomeSectionKey = 'now_playing' | 'summaries' | 'cameras' | 'areas' | 'devices' | 'todos' | 'custom_cards' | 'favorites' | 'scenes';
 export type HomeInformationCardKey = 'people' | 'climate' | 'outdoor_climate' | 'power' | 'device_groups';
 export type MasterActionConfirmationDomain = 'light' | 'switch' | 'fan' | 'cover' | 'lock';
 export type MasterActionConfirmationSettings = Partial<Record<MasterActionConfirmationDomain, boolean>>;
@@ -51,6 +51,8 @@ export interface DwainsDashboardSettings {
   defaultView?: 'home' | 'area';
   weather_entity_id?: string;
   alarm_entity_id?: string;
+  /** Show the alarm chip for `alarm_entity_id`. Default on. */
+  show_alarm?: boolean;
   show_weather?: boolean;
   show_time?: boolean;
   show_notifications?: boolean;
@@ -58,6 +60,11 @@ export interface DwainsDashboardSettings {
   hidden_persons?: string[];
   hide_unavailable_entities?: boolean;
   hide_unavailable_entities_on_devices?: boolean;
+  /**
+   * Drop the area name from entity names on pages and groups that already show
+   * the area. Default on; only `false` turns it off.
+   */
+  hide_area_name_in_entity_names?: boolean;
   show_recent_devices_panel?: boolean;
   restrict_non_admin_ha_sidebar?: boolean;
   restrict_non_admin_dashboard_settings?: boolean;
@@ -76,7 +83,19 @@ export interface DwainsDashboardSettings {
   home_scenes?: string[];
   /** Thermostat in the room header for rooms with one climate entity. Default on. */
   show_area_thermostat?: boolean;
-  /** Where the Now playing bar is shown. Default 'home'. */
+  /** Favorites of the room as a foldable group on the room page. Default on. */
+  show_area_favorites?: boolean;
+  /**
+   * Show the Now playing bar on the room pages. When not set, the room pages
+   * follow `now_playing_bar === 'all'`.
+   */
+  show_area_now_playing?: boolean;
+  /**
+   * Where the Now playing bar was shown before it became a Home section. Only
+   * read as a fallback: for Home while `now_playing` is in neither
+   * `home_sections_order` nor `home_sections_hidden`, and for the room pages
+   * while `show_area_now_playing` is not set.
+   */
   now_playing_bar?: 'off' | 'home' | 'all';
 }
 
@@ -164,7 +183,10 @@ export interface BlueprintReplacements {
 }
 
 export interface DeviceAdmission {
+  /** Devices hidden in all of Dwains Dashboard. */
   hidden_devices?: string[];
+  /** Entities hidden on the Devices page only, sorted. */
+  hidden_entities?: string[];
   first_seen_devices?: Record<string, number>;
 }
 

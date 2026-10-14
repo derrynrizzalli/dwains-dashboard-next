@@ -7,6 +7,7 @@ import memoizeOne from 'memoize-one';
 import type { HassEntity, HomeAssistant } from '../types/home-assistant';
 import type { DwainsDashboardConfig, EntityConfig } from '../types/strategy';
 import { getDeviceClassName, getDomainName } from '../utils/domain-names';
+import { areaEntityDisplayName } from '../utils/entity-names';
 import { isEntityVisibleInArea, isRegistryEntryVisible } from '../utils/entity-visibility';
 import { getAreaIcon, getDeviceClassIcon, getDomainColor, getDomainIcon } from '../utils/icons';
 import { ddLocale, ddLocalize, ddLocalizePlural } from '../utils/localize';
@@ -1232,7 +1233,10 @@ export class DwainsDomainEntitiesDialog extends LitElement {
       state.attributes?.icon ||
       getDeviceClassIcon(domain, deviceClass) ||
       getDomainIcon(domain);
-    const name = state.attributes?.friendly_name || getEntityRegistry(this.hass)[entity.entity_id]?.name || entity.entity_id;
+    const fullName = state.attributes?.friendly_name || getEntityRegistry(this.hass)[entity.entity_id]?.name || entity.entity_id;
+    // The card shows the area above the name, so the name can leave it out.
+    const areaName = this._entityAreaName(entity);
+    const name = areaEntityDisplayName(fullName, areaName, this._params?.config?.settings);
     const active = this._isEntityActiveForUi(state, domain);
     const unavailable = this._isUnavailable(state);
     const classes = [
@@ -1274,7 +1278,7 @@ export class DwainsDomainEntitiesDialog extends LitElement {
         style=${`--entity-color: ${this._entityColor(domain, deviceClass)};`}
         role="button"
         tabindex="0"
-        aria-label=${name}
+        aria-label=${fullName}
         @click=${() => this._showMoreInfo(entity.entity_id)}
         @keydown=${(event: KeyboardEvent) => this._handleEntityKeydown(event, entity.entity_id)}
       >
@@ -1285,7 +1289,7 @@ export class DwainsDomainEntitiesDialog extends LitElement {
           ${this._renderEntityActions(state, domain, active)}
         </div>
         <div class="domain-entity-copy">
-          <div class="domain-entity-meta">${fallbackMeta || this._entityAreaName(entity) || this._t('dialog.no_area')}</div>
+          <div class="domain-entity-meta">${fallbackMeta || areaName || this._t('dialog.no_area')}</div>
           <div class="domain-entity-name">${name}</div>
           <div class="domain-entity-status">${this._entityStatusText(state, domain)}</div>
         </div>
