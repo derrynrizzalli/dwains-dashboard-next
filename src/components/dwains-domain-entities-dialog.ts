@@ -15,6 +15,13 @@ import { formatEntityStateWithUnit, formatValueWithUnit } from '../utils/unit-fo
 import './utils/dd-card-host';
 import { getEntityRegistry } from '../utils/entity-registry';
 import { closeDialogThenNavigate } from '../utils/dialog-history';
+import {
+  SheetDragController,
+  animateSheetIn,
+  findDialogPanel,
+  shouldAnimateSheet,
+} from '../utils/sheet-drag-controller';
+import { dialogSheetStyles } from './styles/dialog-sheet-styles';
 
 export interface DomainEntitiesDialogParams {
   domain: string;
@@ -58,6 +65,10 @@ export class DwainsDomainEntitiesDialog extends LitElement {
   private _updateInterval?: number;
   private _mobileSheetAnimated = false;
   private _optimisticCleanupTimer?: number;
+  private _sheetDrag = new SheetDragController(this, {
+    getPanel: () => findDialogPanel(this.renderRoot?.querySelector('ha-dialog')),
+    onClose: () => this.closeDialog(),
+  });
 
   private _t(key: string, vars?: Record<string, string | number>): string {
     return ddLocalize(this.hass, key, vars);
@@ -67,40 +78,7 @@ export class DwainsDomainEntitiesDialog extends LitElement {
     return ddLocalizePlural(this.hass, key, count);
   }
 
-  static override styles = css`
-    :host {
-      --mdc-dialog-min-width: 90vw;
-      --mdc-dialog-max-width: 1200px;
-      --mdc-dialog-max-height: 90vh;
-      --mdc-dialog-z-index: 10;
-      --dialog-backdrop-opacity: 0.4;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    ha-dialog {
-      --mdc-dialog-heading-ink-color: var(--primary-text-color);
-      --mdc-dialog-content-ink-color: var(--primary-text-color);
-      --dialog-content-padding: 0;
-      --ha-dialog-scrim-backdrop-filter: brightness(72%) blur(2px);
-      --mdc-dialog-scrim-color: rgba(0, 0, 0, 0.28);
-    }
-
-    ha-dialog-header {
-      --mdc-typography-headline6-font-size: 20px;
-      --mdc-typography-headline6-font-weight: 500;
-    }
-
-    .sheet-handle {
-      display: none;
-    }
-
-    .content {
-      padding: 16px 18px 22px !important;
-      overflow: auto;
-      max-height: calc(90vh - 120px);
-      background: var(--primary-background-color);
-    }
-
+  static override styles = [dialogSheetStyles, css`
     .area-section {
       margin-bottom: 18px;
       background: color-mix(in srgb, var(--card-background-color) 98%, #ffffff);
@@ -508,60 +486,7 @@ export class DwainsDomainEntitiesDialog extends LitElement {
       font-size: 14px;
     }
 
-    /* Responsive design */
     @media (max-width: 600px) {
-      :host {
-        --mdc-dialog-min-width: min(calc(100vw - 4px), 480px);
-        --mdc-dialog-max-width: min(calc(100vw - 4px), 480px);
-        --mdc-dialog-min-height: calc(100dvh - 54px);
-        --mdc-dialog-max-height: calc(100dvh - 54px);
-        --ha-dialog-min-height: calc(100dvh - 54px);
-        --ha-dialog-max-height: calc(100dvh - 54px);
-        --vertical-align-dialog: flex-end;
-        --dialog-surface-margin-top: 54px;
-        --dialog-container-padding: 0;
-        --ha-dialog-scrim-backdrop-filter: brightness(66%) blur(2px);
-        --mdc-dialog-scrim-color: rgba(0, 0, 0, 0.34);
-      }
-
-      ha-dialog {
-        margin: 0 !important;
-        border-radius: 24px 24px 0 0 !important;
-        --mdc-dialog-container-elevation: 0 18px 50px rgba(15, 23, 42, 0.28);
-        --ha-dialog-border-radius: 24px 24px 0 0;
-        --ha-dialog-show-duration: 1ms;
-        --show-duration: 1ms;
-        --ha-dialog-hide-duration: 160ms;
-        --hide-duration: 160ms;
-      }
-
-      ha-dialog .mdc-dialog__surface {
-        border-radius: 24px 24px 0 0 !important;
-        overflow: hidden;
-      }
-
-      ha-dialog-header {
-        position: relative;
-        padding-top: 22px;
-      }
-
-      .sheet-handle {
-        display: block;
-        position: absolute;
-        top: 8px;
-        left: 50%;
-        width: 38px;
-        height: 4px;
-        border-radius: 999px;
-        transform: translateX(-50%);
-        background: color-mix(in srgb, var(--secondary-text-color) 24%, transparent);
-      }
-
-      .content {
-        max-height: calc(100dvh - 148px);
-        padding: 12px 12px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
-      }
-
       .area-section {
         margin-bottom: 16px;
         border-radius: 14px;
@@ -577,7 +502,7 @@ export class DwainsDomainEntitiesDialog extends LitElement {
         min-height: 126px;
       }
     }
-  `;
+  `];
 
   public async showDialog(params: DomainEntitiesDialogParams): Promise<void> {
     this._params = params;
@@ -614,8 +539,14 @@ export class DwainsDomainEntitiesDialog extends LitElement {
     this._animateMobileSheetIn();
   }
 
-  disconnectedCallback(): void {
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._sheetDrag.attach();
+  }
+
+  override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._sheetDrag.detach();
     if (this._optimisticCleanupTimer !== undefined) {
       window.clearTimeout(this._optimisticCleanupTimer);
       this._optimisticCleanupTimer = undefined;
@@ -623,43 +554,12 @@ export class DwainsDomainEntitiesDialog extends LitElement {
   }
 
   private _animateMobileSheetIn(): void {
-    if (
-      this._mobileSheetAnimated ||
-      !this._params ||
-      typeof window === 'undefined' ||
-      !window.matchMedia('(max-width: 600px)').matches ||
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
-      return;
-    }
+    if (this._mobileSheetAnimated || !this._params || !shouldAnimateSheet()) return;
 
     requestAnimationFrame(() => {
-      const haDialog = this.renderRoot.querySelector('ha-dialog') as HTMLElement | null;
-      const haDialogRoot = haDialog?.shadowRoot;
-      const waDialog = haDialogRoot?.querySelector('wa-dialog') as HTMLElement | null;
-      const waDialogRoot = waDialog?.shadowRoot;
-      const panel = (
-        waDialogRoot?.querySelector('[part~="panel"]') ||
-        waDialogRoot?.querySelector('dialog') ||
-        haDialogRoot?.querySelector('.mdc-dialog__surface') ||
-        haDialogRoot?.querySelector('[part~="surface"]')
-      ) as HTMLElement | null;
-
-      if (!panel?.animate) return;
-
-      this._mobileSheetAnimated = true;
-
-      panel.animate(
-        [
-          { transform: 'translate3d(0, 100%, 0)', opacity: 0.98 },
-          { transform: 'translate3d(0, 0, 0)', opacity: 1 },
-        ],
-        {
-          duration: 280,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          fill: 'both',
-        }
-      );
+      if (animateSheetIn(findDialogPanel(this.renderRoot.querySelector('ha-dialog')))) {
+        this._mobileSheetAnimated = true;
+      }
     });
   }
 
