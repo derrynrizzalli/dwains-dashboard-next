@@ -88,7 +88,18 @@ for (const file of localeFiles) {
     if (expected.join('|') !== actual.join('|')) errors.push(`${file}: placeholders differ for ${key}`);
   }
   for (const key of dictionary.keys()) {
-    if (!english.has(key)) errors.push(`${file}: unknown ${key}`);
+    if (english.has(key)) continue;
+    // Languages may add extra plural forms (few, many, ...) for plural keys.
+    const base = key.replace(/\.(zero|two|few|many)$/, '');
+    const other = english.get(`${base}.other`);
+    if (base === key || other === undefined || !english.has(`${base}.one`)) {
+      errors.push(`${file}: unknown ${key}`);
+      continue;
+    }
+    if (!dictionary.get(key)?.trim()) errors.push(`${file}: empty ${key}`);
+    const expected = [...other.matchAll(placeholderPattern)].map((match) => match[0]).sort();
+    const actual = [...dictionary.get(key).matchAll(placeholderPattern)].map((match) => match[0]).sort();
+    if (expected.join('|') !== actual.join('|')) errors.push(`${file}: placeholders differ for ${key}`);
   }
 }
 

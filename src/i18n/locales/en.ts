@@ -820,4 +820,12 @@ export const en = {
 } as const;
 
 export type TranslationKey = keyof typeof en;
-export type TranslationDictionary = Record<TranslationKey, string>;
+
+type PluralBase = {
+  [Key in TranslationKey]: Key extends `${infer Base}.other` ? Base : never;
+}[TranslationKey];
+
+/** Extra plural forms a language can add on top of the shared one/other keys. */
+export type PluralFormKey = `${PluralBase}.${'zero' | 'two' | 'few' | 'many'}`;
+
+export type TranslationDictionary = Record<TranslationKey, string> & Partial<Record<PluralFormKey, string>>;

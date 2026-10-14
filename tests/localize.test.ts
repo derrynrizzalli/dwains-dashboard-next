@@ -87,13 +87,45 @@ describe('ddLocalizePlural', () => {
     expect(ddLocalizePlural(hass('en'), 'common.device', 2)).toBe('2 devices');
   });
 
-  it('follows the plural rules of the locale', () => {
+  it('follows the plural rules of the locale', async () => {
+    await Promise.all([loadTranslations('fr'), loadTranslations('ru')]);
     // French uses the singular for zero.
     const frZero = ddLocalizePlural(hass('fr'), 'common.device', 0);
     expect(frZero).toBe(ddLocalize(hass('fr'), 'common.device.one', { count: 0 }));
-    // Russian "few" and "many" fall back to the "other" string.
-    expect(ddLocalizePlural(hass('ru'), 'common.device', 3)).toBe(
-      ddLocalize(hass('ru'), 'common.device.other', { count: 3 })
+    expect(ddLocalizePlural(hass('ru'), 'common.device', 3)).toBe('3 устройства');
+  });
+
+  it.each([
+    [0, '0 устройств'],
+    [1, '1 устройство'],
+    [2, '2 устройства'],
+    [5, '5 устройств'],
+    [11, '11 устройств'],
+    [21, '21 устройство'],
+    [22, '22 устройства'],
+    [25, '25 устройств'],
+    [101, '101 устройство'],
+    [1.5, '1.5 устройства'],
+  ])('uses the Russian plural form for %s devices', async (count, expected) => {
+    await loadTranslations('ru');
+    expect(ddLocalizePlural(hass('ru'), 'common.device', count)).toBe(expected);
+  });
+
+  it('uses Russian few and many with adjective agreement', async () => {
+    await loadTranslations('ru');
+    expect(ddLocalizePlural(hass('ru'), 'common.entity', 3)).toBe('3 сущности');
+    expect(ddLocalizePlural(hass('ru'), 'common.person', 2)).toBe('2 человека');
+    expect(ddLocalizePlural(hass('ru'), 'common.person', 5)).toBe('5 человек');
+    expect(ddLocalizePlural(hass('ru'), 'status.light_on', 2)).toBe('2 включённых светильника');
+    expect(ddLocalizePlural(hass('ru'), 'status.light_on', 5)).toBe('5 включённых светильников');
+  });
+
+  it('falls back to one and other when a language has no extra form', async () => {
+    await loadTranslations('de');
+    // Arabic resolves to the English dictionary, which only has one/other.
+    expect(ddLocalizePlural(hass('ar'), 'common.device', 3)).toBe('3 devices');
+    expect(ddLocalizePlural(hass('de'), 'common.device', 3)).toBe(
+      ddLocalize(hass('de'), 'common.device.other', { count: 3 })
     );
   });
 

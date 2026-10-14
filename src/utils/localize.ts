@@ -82,7 +82,12 @@ export function ddLocalizePlural(
   vars?: Record<string, string | number>
 ): string {
   const category = getPluralRules(ddLocale(hass)).select(count);
-  return ddLocalize(hass, `${key}.${category === 'one' ? 'one' : 'other'}`, {
+  // Languages like Russian need extra forms (few, many). Use them when the
+  // active dictionary has one, otherwise fall back to one/other.
+  const dict = TRANSLATIONS[ddLang(hass)] as Record<string, string> | undefined;
+  const exactKey = `${key}.${category}`;
+  const pluralKey = dict?.[exactKey] !== undefined ? exactKey : `${key}.${category === 'one' ? 'one' : 'other'}`;
+  return ddLocalize(hass, pluralKey, {
     count,
     ...vars,
   });
