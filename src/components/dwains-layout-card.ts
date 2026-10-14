@@ -60,6 +60,7 @@ import { buildHousePowerUsage } from '../utils/power-usage';
 import { normalizeHomeScenes, resolveHomeSceneItems, type HomeSceneItem } from '../utils/home-scenes';
 import { formatEntityStateWithUnit, formatValueWithUnit } from '../utils/unit-format';
 import { showDomainEntitiesDialog } from './utils/show-domain-entities-dialog';
+import { showHousePowerDialog } from './utils/show-house-power-dialog';
 import { showCardEditorDialog } from './utils/show-card-editor-dialog';
 import { layoutCardStyles } from './styles/layout-card-styles';
 import { layoutControlsStyles } from './styles/layout-controls-styles';
@@ -159,6 +160,15 @@ interface HouseClimateMetric {
   icon: string;
   color: string;
   entityIds: string[];
+  /** Room of each sensor (the area that uses it as temperature or humidity sensor). */
+  entityAreas: Record<string, string>;
+}
+
+interface HouseClimateValue {
+  value: number;
+  unit: string;
+  entityId: string;
+  areaId: string;
 }
 
 interface HouseClimateSummary {
@@ -2836,7 +2846,7 @@ export class DwainsLayoutCard extends LitElement {
     return html`
       <div
         class="home-status-card house-power-card wattage ${powerUsage.sensorCount ? 'has-power' : 'is-empty'}"
-        @click=${() => this._openDeviceDomain('energy')}
+        @click=${this._showHousePower}
         @keydown=${this._handleHousePowerKeydown}
         data-domain="wattage"
         role="button"
@@ -2943,7 +2953,14 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _handleHousePowerKeydown = (event: KeyboardEvent): void => {
-    this._handleActivationKeydown(event, () => this._openDeviceDomain('energy'));
+    this._handleActivationKeydown(event, this._showHousePower);
+  };
+
+  private _showHousePower = (): void => {
+    showHousePowerDialog(this, {
+      config: this.config,
+      onViewEnergy: () => this._openDeviceDomain('energy'),
+    });
   };
 
   private _handleHouseClimateKeydown(event: KeyboardEvent, scope: HouseClimateScope): void {
@@ -2979,8 +2996,12 @@ export class DwainsLayoutCard extends LitElement {
       domain: 'sensor',
       config: this.config,
       entityIds,
+      entityAreas: Object.assign({}, ...metrics.map(metric => metric.entityAreas)),
       customTitle: title,
-      viewAllLabel: this._t('home.view_sensors'),
+      homeInformation: true,
+      homeInformationPresentation: 'devices',
+      deviceViewKey: kind ? `sensor.${kind}` : 'sensor',
+      viewAllLabel: this._t('navigation.open_devices'),
       onViewAll: () => this._openDeviceDomain('sensor'),
     });
   }
@@ -3008,8 +3029,8 @@ export class DwainsLayoutCard extends LitElement {
         role="button"
         tabindex="0"
         aria-label=${`${this._t('home.people')}: ${subtitle}`}
-        @click=${() => this._openDeviceDomain('person')}
-        @keydown=${(event: KeyboardEvent) => this._handleActivationKeydown(event, () => this._openDeviceDomain('person'))}
+        @click=${() => this._showPersonEntities()}
+        @keydown=${(event: KeyboardEvent) => this._handleActivationKeydown(event, () => this._showPersonEntities())}
         data-domain="person"
       >
         <div class="house-persons-head">
@@ -3036,7 +3057,7 @@ export class DwainsLayoutCard extends LitElement {
                 aria-label=${this._tp('home.more_people', hiddenCount)}
                 @click=${(event: Event) => {
                   event.stopPropagation();
-                  this._openDeviceDomain('person');
+                  this._showPersonEntities();
                 }}
               >+${hiddenCount}</button>
             ` : nothing}
@@ -3233,7 +3254,7 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _getHouseClimateSummary(scope: HouseClimateScope = 'indoor'): HouseClimateSummary {
-    const values: Record<HouseClimateMetric['kind'], Array<{ value: number; unit: string; entityIds: string[] }>> = { temperature: [], humidity: [] };
+    const values: Record<HouseClimateMetric['kind'], HouseClimateValue[]> = { temperature: [], humidity: [] };
     const excludedAreas = new Set(this.config?.settings?.home_climate_excluded_areas || []);
     const outdoorAreas = new Set(this.config?.settings?.home_outdoor_climate_areas || []);
     // Outdoor areas never count for the indoor average. They are often hidden
@@ -3250,7 +3271,7 @@ export class DwainsLayoutCard extends LitElement {
         if (!state || state.state === 'unavailable' || state.state === 'unknown') return;
         const value = Number.parseFloat(state.state);
         if (!Number.isFinite(value)) return;
-        values[kind].push({ value, unit: String(state.attributes?.unit_of_measurement || (kind === 'temperature' ? this.hass?.config?.unit_system?.temperature || '°C' : '%')), entityIds: [entityId] });
+        values[kind].push({ value, unit: String(state.attributes?.unit_of_measurement || (kind === 'temperature' ? this.hass?.config?.unit_system?.temperature || '°C' : '%')), entityId, areaId: area.area_id });
       });
     });
     const metrics: HouseClimateMetric[] = [];
@@ -3263,7 +3284,7 @@ export class DwainsLayoutCard extends LitElement {
 
   private _houseClimateMetric(
     kind: HouseClimateMetric['kind'],
-    values: Array<{ value: number; unit: string; entityIds: string[] }>,
+    values: HouseClimateValue[],
     scope: HouseClimateScope = 'indoor'
   ): HouseClimateMetric | undefined {
     if (!values.length) return undefined;
@@ -3286,7 +3307,8 @@ export class DwainsLayoutCard extends LitElement {
       count: values.length,
       icon: kind === 'temperature' ? getDeviceClassIcon('sensor', 'temperature') : getDeviceClassIcon('sensor', 'humidity'),
       color: kind === 'temperature' ? getDomainColor('sensor', 'temperature') : getDomainColor('sensor', 'humidity'),
-      entityIds: [...new Set(values.flatMap(item => item.entityIds))],
+      entityIds: [...new Set(values.map(item => item.entityId))],
+      entityAreas: Object.fromEntries(values.map(item => [item.entityId, item.areaId])),
     };
   }
 
@@ -7287,14 +7309,18 @@ export class DwainsLayoutCard extends LitElement {
       return;
     }
 
+    const deviceViewKey = this._statusDeviceDomainKey(domain);
     showDomainEntitiesDialog(this, {
       domain: domain.domain,
       config: this.config,
       deviceClass: domain.deviceClass,
       entityIds,
       customTitle: domain.name,
-      viewAllLabel: this._t('common.view_all'),
-      onViewAll: () => this._openDeviceDomain(this._statusDeviceDomainKey(domain)),
+      homeInformation: true,
+      homeInformationPresentation: 'devices',
+      deviceViewKey,
+      viewAllLabel: this._t('navigation.open_devices'),
+      onViewAll: () => this._openDeviceDomain(deviceViewKey),
     });
   }
 
@@ -7305,10 +7331,27 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _showPersonEntities() {
-    // TODO: Implement person entities dialog
+    // Same order as the card: people without location data last.
+    const persons = this._getVisiblePersonEntities();
+    const entityIds = [
+      ...persons.filter(person => !this._isPersonLocationUnknown(person)),
+      ...persons.filter(person => this._isPersonLocationUnknown(person)),
+    ].map(person => person.entity_id);
+    if (!entityIds.length) {
+      this._openDeviceDomain('person');
+      return;
+    }
+
     showDomainEntitiesDialog(this, {
       domain: 'person',
-      config: this.config
+      config: this.config,
+      entityIds,
+      customTitle: this._t('home.people'),
+      homeInformation: true,
+      homeInformationPresentation: 'devices',
+      deviceViewKey: 'person',
+      viewAllLabel: this._t('navigation.open_devices'),
+      onViewAll: () => this._openDeviceDomain('person'),
     });
   }
 

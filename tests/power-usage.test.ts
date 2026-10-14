@@ -11,6 +11,7 @@ import {
 import {
   buildHousePowerUsage,
   computeEnergyHousePower,
+  createHousePowerUsageMemo,
   getSignedPowerValueWatts,
 } from '../src/utils/power-usage';
 import type { HomeAssistant } from '../src/types/home-assistant';
@@ -290,6 +291,35 @@ describe('buildHousePowerUsage', () => {
     const summary = buildHousePowerUsage(hassWithStates([]), config, null);
     expect(summary.sensorCount).toBe(0);
     expect(summary.formattedTotal).toBe('');
+  });
+
+  it('only recomputes when a power sensor, the config or the registry changes', () => {
+    const memo = createHousePowerUsageMemo();
+    const first = hass();
+    const summary = memo(first, config);
+
+    const withLight = { ...first, states: { ...first.states, 'light.lamp': entityState('light.lamp', 'on') } } as HomeAssistant;
+    expect(memo(withLight, config)).toBe(summary);
+
+    const withTemperature = {
+      ...withLight,
+      states: { ...withLight.states, 'sensor.temperature': entityState('sensor.temperature', '21', { unit_of_measurement: '°C' }) },
+    } as HomeAssistant;
+    expect(memo(withTemperature, config)).toBe(summary);
+
+    const withPower = {
+      ...withTemperature,
+      states: { ...withTemperature.states, 'sensor.tv_power': watt('sensor.tv_power', 200, 'W', { friendly_name: 'TV power' }) },
+    } as HomeAssistant;
+    const next = memo(withPower, config);
+    expect(next).not.toBe(summary);
+    expect(next.areas.find((area) => area.areaId === 'living')?.totalWatts).toBe(200);
+
+    const configCopy = { ...config };
+    const afterConfig = memo(withPower, configCopy);
+    expect(afterConfig).not.toBe(next);
+    expect(memo(withPower, configCopy)).toBe(afterConfig);
+    expect(memo({ ...withPower, entities: { ...entities } } as HomeAssistant, configCopy)).not.toBe(afterConfig);
   });
 });
 

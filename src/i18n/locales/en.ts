@@ -223,7 +223,6 @@ export const en = {
   'home.average_humidity': 'Average humidity',
   'home.temperature': 'Temperature',
   'home.humidity': 'Humidity',
-  'home.view_sensors': 'View sensors',
   'home.people': 'People',
   'home.no_people': 'No people',
   'home.no_visible_people': 'No visible persons configured',
@@ -491,6 +490,9 @@ export const en = {
   'dialog.tamper_sensors': 'Tamper sensors',
   'dialog.vibration_sensors': 'Vibration sensors',
   'dialog.no_area': 'No area',
+  'navigation.open_devices': 'Open device view',
+  'navigation.view_energy_sensors': 'View energy sensors',
+  'devices.area_power_history': 'Power history: {area}',
 
   'replacement.assign': 'Assign replacement',
   'replacement.domain': 'Domain',

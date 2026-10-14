@@ -225,7 +225,6 @@ export const ptBR = {
   'home.average_humidity': 'Umidade média',
   'home.temperature': 'Temperatura',
   'home.humidity': 'Umidade',
-  'home.view_sensors': 'Ver sensores',
   'home.people': 'Pessoas',
   'home.no_people': 'Nenhuma pessoa',
   'home.no_visible_people': 'Nenhuma pessoa visível configurada',
@@ -493,6 +492,9 @@ export const ptBR = {
   'dialog.tamper_sensors': 'Sensores de violação',
   'dialog.vibration_sensors': 'Sensores de vibração',
   'dialog.no_area': 'Sem área',
+  'navigation.open_devices': 'Abrir a visualização de dispositivos',
+  'navigation.view_energy_sensors': 'Ver sensores de energia',
+  'devices.area_power_history': 'Histórico de potência: {area}',
 
   'replacement.assign': 'Atribuir substituição',
   'replacement.domain': 'Domínio',

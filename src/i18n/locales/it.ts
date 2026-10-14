@@ -225,7 +225,6 @@ export const it = {
   'home.average_humidity': 'Umidità media',
   'home.temperature': 'Temperatura',
   'home.humidity': 'Umidità',
-  'home.view_sensors': 'Visualizza sensori',
   'home.people': 'Persone',
   'home.no_people': 'Nessuna persona',
   'home.no_visible_people': 'Nessuna persona visibile configurata',
@@ -493,6 +492,9 @@ export const it = {
   'dialog.tamper_sensors': 'Sensori antimanomissione',
   'dialog.vibration_sensors': 'Sensori di vibrazione',
   'dialog.no_area': 'Nessuna stanza',
+  'navigation.open_devices': 'Apri la vista Dispositivi',
+  'navigation.view_energy_sensors': 'Mostra sensori di energia',
+  'devices.area_power_history': 'Cronologia della potenza: {area}',
 
   'replacement.assign': 'Assegna sostituzione',
   'replacement.domain': 'Dominio',

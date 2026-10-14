@@ -36,3 +36,9 @@ Maintenance focuses on entities that need attention, such as low battery entitie
 ## Energy
 
 The Energy page shows live power usage by area. It uses power entities from Home Assistant and groups them by area.
+
+- **Whole house** shows the total with a graph of the last day. When a grid power sensor is set in the Home Assistant energy settings, the total and the graph come from those sensors (grid, solar and battery). Otherwise the total is the sum of the rooms.
+- **Top area** is the room that uses the most right now, with its three biggest consumers.
+- Every room gets a card with its total, a graph and its power sensors, each with a bar for its share of the room.
+
+Graphs only include sensors with long term statistics (a state class). The House power usage popup on Home shows the same overview.

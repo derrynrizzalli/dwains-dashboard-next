@@ -225,7 +225,6 @@ export const ru = {
   'home.average_humidity': 'Средняя влажность',
   'home.temperature': 'Температура',
   'home.humidity': 'Влажность',
-  'home.view_sensors': 'Просмотреть датчики',
   'home.people': 'Люди',
   'home.no_people': 'Нет людей',
   'home.no_visible_people': 'Нет настроенных видимых пользователей',
@@ -493,6 +492,9 @@ export const ru = {
   'dialog.tamper_sensors': 'Датчики вскрытия',
   'dialog.vibration_sensors': 'Датчики вибрации',
   'dialog.no_area': 'Без области',
+  'navigation.open_devices': 'Открыть раздел устройств',
+  'navigation.view_energy_sensors': 'Показать датчики энергии',
+  'devices.area_power_history': 'История мощности: {area}',
 
   'replacement.assign': 'Назначить замену',
   'replacement.domain': 'Домен',
