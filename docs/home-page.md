@@ -8,10 +8,13 @@ The header can show:
 
 - User avatar and greeting
 - Home status summary
+- Alarm chip
 - Weather
 - Notifications
 - Time and date on desktop
 - Settings button
+
+The alarm chip is red and pulses while the alarm is triggered, blue when it is armed, green when it is disarmed and grey while it is arming or pending. Pick the alarm in **Dashboard settings > Header & status**.
 
 ## Now Playing
 
@@ -55,6 +58,16 @@ House information can show:
 - Device group cards such as lights, switches and covers
 
 Each house information card can be enabled or disabled in Dashboard settings.
+
+### Status cards
+
+The device group cards only appear while something is active. Tap a card to see its entities; **View all** opens the device group.
+
+- Covers are split by type: **Windows open**, **Doors open**, **Gates open** (garages and gates) and **Shading closed** (blinds, shutters, curtains and covers without a type). A partly open window counts as open and partly lowered shading as closed. Awnings count as shading while they are rolled out.
+- Open windows and doors, smoke and leaks show an alert icon.
+- Urgent cards are red and come first: the alarm and smoke, gas, leak, carbon monoxide, problem, safety, tamper, heat and cold sensors. While the alarm is triggered, motion, windows, doors, openings and gates are urgent too.
+
+On desktop, room pages show the same cards in a row at the top. When they do not fit, arrow buttons appear at the ends of the row and the mouse wheel scrolls it sideways.
 
 ### Indoor and outdoor climate
 
