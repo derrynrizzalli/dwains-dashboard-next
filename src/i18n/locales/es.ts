@@ -298,6 +298,7 @@ export const es = {
   'domain.cover_shading': 'Protección solar',
   'status.scroll_previous': 'Estados anteriores',
   'status.scroll_next': 'Más estados',
+  'sidebar.more_status': 'Más estados activos',
   'action.turn_on': 'Encender',
   'action.activate': 'Activar',
   'action.open_camera': 'Abrir cámara',

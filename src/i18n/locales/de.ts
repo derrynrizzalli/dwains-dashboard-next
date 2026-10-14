@@ -298,6 +298,7 @@ export const de = {
   'domain.cover_shading': 'Beschattung',
   'status.scroll_previous': 'Vorherige Status',
   'status.scroll_next': 'Weitere Status',
+  'sidebar.more_status': 'Weitere aktive Status',
   'action.turn_on': 'Einschalten',
   'action.activate': 'Aktivieren',
   'action.open_camera': 'Kamera öffnen',

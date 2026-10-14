@@ -305,6 +305,7 @@ export const ptBR = {
   'domain.cover_shading': 'Sombreamento',
   'status.scroll_previous': 'Status anteriores',
   'status.scroll_next': 'Mais status',
+  'sidebar.more_status': 'Mais status ativos',
 
   'action.turn_on': 'Ligar',
   'action.activate': 'Ativar',

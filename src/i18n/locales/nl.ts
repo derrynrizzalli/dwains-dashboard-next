@@ -298,6 +298,7 @@ export const nl = {
   'domain.cover_shading': 'Zonwering',
   'status.scroll_previous': 'Vorige status',
   'status.scroll_next': 'Meer status',
+  'sidebar.more_status': 'Meer actieve statussen',
   'action.turn_on': 'Schakel in',
   'action.activate': 'Activeren',
   'action.open_camera': 'Camera openen',

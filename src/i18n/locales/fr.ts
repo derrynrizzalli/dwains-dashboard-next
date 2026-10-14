@@ -298,6 +298,7 @@ export const fr = {
   'domain.cover_shading': 'Occultation',
   'status.scroll_previous': 'Statuts précédents',
   'status.scroll_next': 'Plus de statuts',
+  'sidebar.more_status': 'Autres statuts actifs',
   'action.turn_on': 'Allumer',
   'action.activate': 'Activer',
   'action.open_camera': 'Ouvrir la caméra',

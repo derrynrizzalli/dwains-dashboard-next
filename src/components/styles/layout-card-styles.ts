@@ -2801,9 +2801,30 @@ export const layoutCardStyles = css`
       color: var(--badge-color, #df5b63);
     }
 
-    .info-badge.alerts {
-      background: color-mix(in srgb, var(--error-color) 10%, var(--card-background-color));
-      color: var(--error-color);
+    /* Status badges of an area; --badge-color is set per badge and is red
+       for urgent ones. */
+    .info-badge.status-badge {
+      background: color-mix(in srgb, var(--badge-color, var(--primary-color)) 10%, var(--card-background-color));
+      color: var(--badge-color, var(--primary-color));
+    }
+
+    /* "+N": more badges than fit. */
+    .info-badge.status-badge.more,
+    .mobile-area-badge.more {
+      --badge-color: var(--secondary-text-color);
+      --area-badge-color: var(--secondary-text-color);
+    }
+
+    .info-badge.status-badge.more {
+      justify-content: center;
+      min-width: 24px;
+      font-weight: 700;
+    }
+
+    /* Shows its tooltip; a click selects the area like the rest of the item. */
+    .area-button .info-badge.more {
+      pointer-events: auto;
+      cursor: pointer;
     }
 
     /* Sidebar info badges (smaller) */

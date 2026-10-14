@@ -298,6 +298,7 @@ export const zhHans = {
   'domain.cover_shading': '遮阳',
   'status.scroll_previous': '上一组状态',
   'status.scroll_next': '更多状态',
+  'sidebar.more_status': '更多活动状态',
   'action.turn_on': '打开',
   'action.activate': '激活',
   'action.open_camera': '打开摄影机',

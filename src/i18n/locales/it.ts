@@ -305,6 +305,7 @@ export const it = {
   'domain.cover_shading': 'Schermature',
   'status.scroll_previous': 'Stati precedenti',
   'status.scroll_next': 'Altri stati',
+  'sidebar.more_status': 'Altri stati attivi',
 
   'action.turn_on': 'Accendi',
   'action.activate': 'Attiva',

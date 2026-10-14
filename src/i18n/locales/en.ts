@@ -303,6 +303,7 @@ export const en = {
   'domain.cover_shading': 'Shading',
   'status.scroll_previous': 'Previous status',
   'status.scroll_next': 'More status',
+  'sidebar.more_status': 'More active status',
 
   'action.turn_on': 'Turn on',
   'action.activate': 'Activate',

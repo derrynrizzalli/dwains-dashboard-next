@@ -26,6 +26,15 @@ import {
 import { getAreaIcon, getDeviceClassIcon, getDomainColor, getDomainIcon } from '../utils/icons';
 import { getStatusDomains, type DomainCount as StatusDomainCount } from '../utils/header-status-domains';
 import { applyStatusUrgency, statusColor } from '../utils/status-urgency';
+import {
+  MOBILE_AREA_BADGE_LIMIT,
+  SIDEBAR_AREA_BADGE_MAX,
+  getAreaStatusBadges,
+  limitAreaStatusBadges,
+  sidebarAreaBadgeLimit,
+  sidebarAreaBadgeLimits,
+  type AreaStatusBadge,
+} from '../utils/area-status-badges';
 import { getDeviceClassName, getDomainName } from '../utils/domain-names';
 import { filterHiddenDeviceEntities } from '../utils/device-admission';
 import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
@@ -199,6 +208,8 @@ export class DwainsLayoutCard extends LitElement {
   @state() private _headerCompact = false;
   @state() private _headerStatusCanScrollLeft = false;
   @state() private _headerStatusCanScrollRight = false;
+  /** Badges per sidebar area, see sidebarAreaBadgeLimits(). Empty until measured. */
+  @state() private _sidebarBadgeLimits: number[] = [];
   private _favoritesRenderVersion = 0;
   @state() private _currentTime = '';
   @state() private _currentDate = '';
@@ -255,6 +266,9 @@ export class DwainsLayoutCard extends LitElement {
   private _headerStatusScrollEl?: HTMLElement;
   private _headerStatusResizeObserver?: ResizeObserver;
   private _headerStatusScrollRaf?: number;
+  // The sidebar area list is measured when its size changes, not per render.
+  private _sidebarListEl?: HTMLElement;
+  private _sidebarListResizeObserver?: ResizeObserver;
   private _persistentNotificationsSubscription = new ManagedSubscription();
   private _persistentNotificationsLoaded = false;
   private _homeSummariesLoaded = false;
@@ -1134,6 +1148,7 @@ export class DwainsLayoutCard extends LitElement {
       this._resizeObserver.disconnect();
     }
     this._headerStatusResizeObserver?.disconnect();
+    this._sidebarListResizeObserver?.disconnect();
   }
 
   protected override shouldUpdate(changedProps: PropertyValues): boolean {
@@ -1652,7 +1667,7 @@ export class DwainsLayoutCard extends LitElement {
 
     return html`
       <nav class=${classMap(classes)} @scroll=${this._handleSidebarScroll}>
-        <div class="area-list">
+        <div class="area-list" ${ref(this._sidebarListRef)}>
           <div
             class="area-button home-button ${this._selectedView === 'home' ? 'selected' : ''} ${hasNotifications ? 'has-notifications' : ''}"
           >
@@ -1678,6 +1693,24 @@ export class DwainsLayoutCard extends LitElement {
       </nav>
     `;
   }
+
+  /** Called by Lit when the sidebar area list is rendered or removed. */
+  private _sidebarListRef = (element?: Element): void => {
+    if (element === this._sidebarListEl) return;
+    this._sidebarListResizeObserver?.disconnect();
+    this._sidebarListEl = element instanceof HTMLElement ? element : undefined;
+    if (!this._sidebarListEl) return;
+    this._sidebarListResizeObserver ??= new ResizeObserver(entries => {
+      const width = entries[entries.length - 1]?.contentRect.width ?? 0;
+      const limits = sidebarAreaBadgeLimits(width);
+      const current = this._sidebarBadgeLimits;
+      // Only render again when the number of badges that fit changes.
+      if (limits.length !== current.length || limits.some((limit, index) => limit !== current[index])) {
+        this._sidebarBadgeLimits = limits;
+      }
+    });
+    this._sidebarListResizeObserver.observe(this._sidebarListEl);
+  };
 
   private _renderHomeNotificationShortcut() {
     if (!this._showNotificationsUi()) return nothing;
@@ -1784,8 +1817,8 @@ export class DwainsLayoutCard extends LitElement {
           <div class="floor-areas">
             ${repeat(
               areas,
-      area => area.area_id,
-              area => this._renderAreaButton(area)
+              area => area.area_id,
+              area => this._renderAreaButton(area, areas.length)
             )}
           </div>
         </div>
@@ -1793,7 +1826,7 @@ export class DwainsLayoutCard extends LitElement {
     });
   }
 
-  private _renderAreaButton(area: any) {
+  private _renderAreaButton(area: any, areasInFloor = 1) {
     const areaData = this._getCachedAreaData(area);
     const isSelected = this._selectedArea === area.area_id;
     const hasPicture = area.picture ? true : false;
@@ -1807,6 +1840,15 @@ export class DwainsLayoutCard extends LitElement {
     const sensorsText = sensors.join(' • ');
     const lightsOn = areaData.domains.light?.on || 0;
     const lightToggleLabel = this._tp('sidebar.turn_off_area_lights', lightsOn, { area: area.name });
+    // Mobile: four places like the area cards. Desktop: as many as fit on
+    // the tile, at most eight badges.
+    const { visible: badges, hidden: hiddenBadges } = this._isMobile
+      ? limitAreaStatusBadges(getAreaStatusBadges(areaData, this._isAlarmTriggered()), MOBILE_AREA_BADGE_LIMIT)
+      : limitAreaStatusBadges(
+          getAreaStatusBadges(areaData, this._isAlarmTriggered()),
+          sidebarAreaBadgeLimit(this._sidebarBadgeLimits, areasInFloor),
+          SIDEBAR_AREA_BADGE_MAX
+        );
 
     // The area item is a container with a full-size select button and, as a
     // sibling, the light toggle; buttons are never nested.
@@ -1841,76 +1883,48 @@ export class DwainsLayoutCard extends LitElement {
                   <ha-icon icon=${getAreaIcon(area)}></ha-icon>
                 </div>
 
-                <!-- Right: Info badges -->
+                <!-- Right: status badges, urgent ones first -->
                 <div class="area-info-badges">
-                  ${lightsOn > 0 ? html`
+                  ${badges.map(badge => badge.domain === 'light' ? html`
                     <button
-                      class="info-badge light clickable area-light-toggle"
+                      class="info-badge status-badge light clickable area-light-toggle"
                       type="button"
-                      style=${this._domainBadgeStyle('light')}
+                      style=${this._areaBadgeStyle(badge)}
                       title=${lightToggleLabel}
                       aria-label=${lightToggleLabel}
                       @click=${(e: Event) => this._handleLightToggle(e, area.area_id)}
                     >
-                      <ha-icon icon=${getDomainIcon('light')}></ha-icon>
-                      <span class="badge-count">${lightsOn}</span>
+                      <ha-icon icon=${badge.icon}></ha-icon>
+                      <span class="badge-count">${badge.count}</span>
                     </button>
-                  ` : nothing}
-
-                  ${areaData.domains.switch && areaData.domains.switch.on > 0 ? html`
-                    <span aria-hidden="true" class="info-badge switch" style=${this._domainBadgeStyle('switch')}>
-                      <ha-icon icon=${getDomainIcon('switch')}></ha-icon>
-                      <span class="badge-count">${areaData.domains.switch.on}</span>
+                  ` : html`
+                    <span
+                      aria-hidden="true"
+                      class="info-badge status-badge ${badge.className} ${badge.urgent ? 'urgent' : ''}"
+                      style=${this._areaBadgeStyle(badge)}
+                    >
+                      <ha-icon icon=${badge.icon}></ha-icon>
+                      <span class="badge-count">${badge.count}</span>
                     </span>
+                  `)}
+                  ${hiddenBadges ? html`
+                    <span
+                      aria-hidden="true"
+                      class="info-badge status-badge more"
+                      title=${this._t('sidebar.more_status')}
+                      @click=${() => this._selectArea(area.area_id)}
+                    >+${hiddenBadges}</span>
                   ` : nothing}
-
-                  ${areaData.domains.climate && areaData.domains.climate.on > 0 ? html`
-                    <span aria-hidden="true" class="info-badge climate" style=${this._domainBadgeStyle('climate')}>
-                      <ha-icon icon=${getDomainIcon('climate')}></ha-icon>
-                      <span class="badge-count">${areaData.domains.climate.on}</span>
-                    </span>
-                  ` : nothing}
-
-                  ${areaData.domains.media_player && areaData.domains.media_player.on > 0 ? html`
-                    <span aria-hidden="true" class="info-badge media_player" style=${this._domainBadgeStyle('media_player')}>
-                      <ha-icon icon=${getDomainIcon('media_player')}></ha-icon>
-                      <span class="badge-count">${areaData.domains.media_player.on}</span>
-                    </span>
-                  ` : nothing}
-
-                  ${areaData.domains.cover && areaData.domains.cover.on > 0 ? html`
-                    <span aria-hidden="true" class="info-badge cover" style=${this._domainBadgeStyle('cover')}>
-                      <ha-icon icon=${getDomainIcon('cover')}></ha-icon>
-                      <span class="badge-count">${areaData.domains.cover.on}</span>
-                    </span>
-                  ` : nothing}
-
-                  ${areaData.domains.fan && areaData.domains.fan.on > 0 ? html`
-                    <span aria-hidden="true" class="info-badge fan" style=${this._domainBadgeStyle('fan')}>
-                      <ha-icon icon=${getDomainIcon('fan')}></ha-icon>
-                      <span class="badge-count">${areaData.domains.fan.on}</span>
-                    </span>
-                  ` : nothing}
-
-                  ${areaData.domains.motion && areaData.domains.motion.on > 0 ? html`
-                    <span aria-hidden="true" class="info-badge motion" style=${this._domainBadgeStyle('binary_sensor', 'motion')}>
-                      <ha-icon icon=${getDeviceClassIcon('binary_sensor', 'motion')}></ha-icon>
-                      <span class="badge-count">${areaData.domains.motion.on}</span>
-                    </span>
-                  ` : nothing}
-
-            ${areaData.alerts.length > 0 ? html`
-                    <span aria-hidden="true" class="info-badge alerts">
-                      <ha-icon icon="mdi:alert-circle"></ha-icon>
-                      <span class="badge-count">${areaData.alerts.length}</span>
-                    </span>
-            ` : nothing}
                 </div>
               </div>
             </div>
             <ha-icon class="area-menu-chevron" icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
           </div>
         `;
+  }
+
+  private _areaBadgeStyle(badge: AreaStatusBadge): string {
+    return `--badge-color: ${badge.color}; --area-badge-color: ${badge.color};`;
   }
 
   private _renderGlobalHeader() {
@@ -2125,11 +2139,6 @@ export class DwainsLayoutCard extends LitElement {
 
   private _statusChipStyle(domain: DomainCount): string {
     return `--status-color: ${statusColor(domain, Boolean(domain.urgent))};`;
-  }
-
-  private _domainBadgeStyle(domain: string, deviceClass?: string): string {
-    const color = getDomainColor(domain, deviceClass);
-    return `--badge-color: ${color}; --area-badge-color: ${color};`;
   }
 
   private _statusCardTitle(domain: DomainCount): string {
@@ -3332,33 +3341,11 @@ export class DwainsLayoutCard extends LitElement {
       areaData.wattage
     ].filter(Boolean).join(' • ');
     const meta = sensorSummary || this._tp('common.device', deviceCount);
-    const badges: Array<{ className: string; icon: string; count: number; color: string }> = [];
     const pictureContrastClass = hasPicture ? this._getPictureContrastClass(area.picture) : '';
-
-    if (areaData.domains.cover?.on) {
-      badges.push({
-        className: 'cover',
-        icon: getDomainIcon('cover'),
-        count: areaData.domains.cover.on,
-        color: getDomainColor('cover'),
-      });
-    }
-    if (areaData.domains.light?.on) {
-      badges.push({
-        className: 'light',
-        icon: getDomainIcon('light'),
-        count: areaData.domains.light.on,
-        color: getDomainColor('light'),
-      });
-    }
-    if (areaData.domains.motion?.on) {
-      badges.push({
-        className: 'motion',
-        icon: getDeviceClassIcon('binary_sensor', 'motion'),
-        count: areaData.domains.motion.on,
-        color: getDomainColor('binary_sensor', 'motion'),
-      });
-    }
+    const { visible: badges, hidden: hiddenBadges } = limitAreaStatusBadges(
+      getAreaStatusBadges(areaData, this._isAlarmTriggered()),
+      MOBILE_AREA_BADGE_LIMIT
+    );
 
     return html`
       <button
@@ -3374,15 +3361,18 @@ export class DwainsLayoutCard extends LitElement {
             <ha-icon icon=${getAreaIcon(area)}></ha-icon>
           </div>
           <div class="mobile-area-badges">
-            ${badges.slice(0, 2).map(badge => html`
+            ${badges.map(badge => html`
               <span
-                class="mobile-area-badge ${badge.className}"
+                class="mobile-area-badge ${badge.className} ${badge.urgent ? 'urgent' : ''}"
                 style=${`--area-badge-color: ${badge.color};`}
               >
                 <ha-icon icon=${badge.icon}></ha-icon>
                 <span>${badge.count}</span>
               </span>
             `)}
+            ${hiddenBadges ? html`
+              <span class="mobile-area-badge more" aria-hidden="true" title=${this._t('sidebar.more_status')}>+${hiddenBadges}</span>
+            ` : nothing}
           </div>
         </div>
         <div class="mobile-area-copy">

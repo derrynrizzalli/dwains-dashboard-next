@@ -305,6 +305,7 @@ export const ru = {
   'domain.cover_shading': 'Затенение',
   'status.scroll_previous': 'Предыдущие статусы',
   'status.scroll_next': 'Ещё статусы',
+  'sidebar.more_status': 'Другие активные статусы',
 
   'action.turn_on': 'Включить',
   'action.activate': 'Активировать',
