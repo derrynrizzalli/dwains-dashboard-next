@@ -764,6 +764,8 @@ export const nl = {
   'domain.cover_gates': 'Poorten',
   'domain.motion': 'Beweging & aanwezigheid',
   'domain.safety': 'Veiligheid & alarmen',
+  'layout.collapse_group': 'Groep inklappen',
+  'layout.expand_group': 'Groep uitklappen',
   'device_class.motion': 'Beweging',
   'device_class.moving': 'Beweging',
   'device_class.occupancy': 'Aanwezigheid',

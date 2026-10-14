@@ -762,6 +762,8 @@ export const zhHans = {
   'domain.cover_gates': '大门',
   'domain.motion': '运动和存在',
   'domain.safety': '安全和警报',
+  'layout.collapse_group': '折叠分组',
+  'layout.expand_group': '展开分组',
   'device_class.motion': '动作',
   'device_class.moving': '动作',
   'device_class.occupancy': '此处有人',

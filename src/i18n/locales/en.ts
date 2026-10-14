@@ -784,6 +784,8 @@ export const en = {
   'domain.cover_gates': 'Gates',
   'domain.motion': 'Motion & presence',
   'domain.safety': 'Safety & alarms',
+  'layout.collapse_group': 'Collapse group',
+  'layout.expand_group': 'Expand group',
 
   'device_class.motion': 'Motion',
   'device_class.moving': 'Motion',

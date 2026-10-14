@@ -764,6 +764,8 @@ export const de = {
   'domain.cover_gates': 'Tore',
   'domain.motion': 'Bewegung & Anwesenheit',
   'domain.safety': 'Sicherheit & Alarme',
+  'layout.collapse_group': 'Gruppe einklappen',
+  'layout.expand_group': 'Gruppe ausklappen',
   'device_class.motion': 'Bewegung',
   'device_class.moving': 'Bewegung',
   'device_class.occupancy': 'Belegung',

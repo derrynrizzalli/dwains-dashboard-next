@@ -786,6 +786,8 @@ export const ptBR = {
   'domain.cover_gates': 'Portões',
   'domain.motion': 'Movimento e presença',
   'domain.safety': 'Segurança e alarmes',
+  'layout.collapse_group': 'Recolher grupo',
+  'layout.expand_group': 'Expandir grupo',
 
   'device_class.motion': 'Movimento',
   'device_class.moving': 'Movimento',

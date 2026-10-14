@@ -786,6 +786,8 @@ export const ru = {
   'domain.cover_gates': 'Ворота',
   'domain.motion': 'Движение и присутствие',
   'domain.safety': 'Безопасность и тревоги',
+  'layout.collapse_group': 'Свернуть группу',
+  'layout.expand_group': 'Развернуть группу',
 
   'device_class.motion': 'Движение',
   'device_class.moving': 'Движение',

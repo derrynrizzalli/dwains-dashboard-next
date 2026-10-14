@@ -219,6 +219,8 @@ export class DwainsLayoutCard extends LitElement {
   @state() private _areaHeaderStuck = false;
   @state() private _areaHeaderRevealed = false;
   @state() private _mobileEntityLayout: 'rail' | 'grid' = 'rail';
+  // Collapsed room groups as `${areaId}:${groupKey}`. Kept in memory only.
+  @state() private _collapsedAreaGroups: ReadonlySet<string> = new Set();
   @state() private _mobileHomeAreasLayout: 'rail' | 'grid' = 'rail';
   @state() private _mobileHomeDevicesLayout: 'rail' | 'grid' = 'rail';
   @state() private _mobileHomeFavoritesLayout: 'rail' | 'grid' = 'rail';
@@ -4737,11 +4739,25 @@ export class DwainsLayoutCard extends LitElement {
             ? group.entities.slice(0, MOBILE_INITIAL_ENTITY_CARDS)
             : group.entities;
           const renderedEntityIds = renderedEntities.map(entity => entity.entity_id);
+          // Edit mode keeps every group open, so all card slots stay reachable.
+          const collapsible = !this._editMode;
+          const collapseKey = `${area.area_id}:${group.key}`;
+          const collapsed = collapsible && this._collapsedAreaGroups.has(collapseKey);
+          const railId = `mobile-group-${group.key}`;
+          const titleCopy = html`
+            <span class="mobile-domain-title-copy">
+              <span class="mobile-domain-title-label">${group.name}</span>
+              ${group.entities.length > 0 && !showsMasterCount ? html`
+                <span class="mobile-domain-count">(${this._tp('common.item', group.entities.length)})</span>
+              ` : nothing}
+            </span>
+          `;
 
           return html`
             <div
               class=${classMap({
                 'mobile-domain-group': true,
+                'is-collapsed': collapsed,
                 'group-editing': this._editMode && this._canManageDashboard(),
                 'group-dragging': this._generatedGroupDrag?.areaId === area.area_id &&
                   this._generatedGroupDrag.groupKey === group.key,
@@ -4771,12 +4787,19 @@ export class DwainsLayoutCard extends LitElement {
                           <ha-icon icon=${gridMode ? 'mdi:view-carousel-outline' : 'mdi:view-grid-outline'}></ha-icon>
                         </button>
                       `}
-                  <span class="mobile-domain-title-copy">
-                    <span class="mobile-domain-title-label">${group.name}</span>
-                    ${group.entities.length > 0 && !showsMasterCount ? html`
-                      <span class="mobile-domain-count">(${this._tp('common.item', group.entities.length)})</span>
-                    ` : nothing}
-                  </span>
+                  ${collapsible ? html`
+                    <button
+                      class="mobile-domain-collapse"
+                      type="button"
+                      aria-expanded=${collapsed ? 'false' : 'true'}
+                      aria-controls=${railId}
+                      title=${this._t(collapsed ? 'layout.expand_group' : 'layout.collapse_group')}
+                      @click=${() => this._toggleAreaGroupCollapsed(collapseKey)}
+                    >
+                      ${titleCopy}
+                      <ha-icon class="mobile-domain-collapse-icon" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+                    </button>
+                  ` : titleCopy}
                 </div>
                 <div class="mobile-domain-header-actions">
                   ${this._editMode && this._canManageDashboard() ? html`
@@ -4832,22 +4855,34 @@ export class DwainsLayoutCard extends LitElement {
                   ${hasActions ? this._renderMobileDomainMaster(group, controllableEntities) : nothing}
                 </div>
 	              </div>
-	              <div class="mobile-entity-rail">
-	                ${this._renderDomainCustomCardSlot(area.area_id, group.key, 0, renderedEntities.length)}
-	                ${repeat(
-	                  renderedEntities,
-	                  entity => entity.entity_id,
-	                  (entity, index) => html`
-                      ${this._renderEditableGeneratedCard(area, entity, group.key, index, renderedEntityIds)}
-                      ${this._renderDomainCustomCardSlot(area.area_id, group.key, index + 1, renderedEntities.length)}
-                    `
-	                )}
+	              <div class="mobile-entity-rail" id=${railId} ?hidden=${collapsed}>
+	                ${collapsed ? nothing : html`
+	                  ${this._renderDomainCustomCardSlot(area.area_id, group.key, 0, renderedEntities.length)}
+	                  ${repeat(
+	                    renderedEntities,
+	                    entity => entity.entity_id,
+	                    (entity, index) => html`
+                        ${this._renderEditableGeneratedCard(area, entity, group.key, index, renderedEntityIds)}
+                        ${this._renderDomainCustomCardSlot(area.area_id, group.key, index + 1, renderedEntities.length)}
+                      `
+	                  )}
+	                `}
 	              </div>
 	            </div>
 	          `;
 	        })}
       </section>
     `;
+  }
+
+  private _toggleAreaGroupCollapsed(collapseKey: string): void {
+    const next = new Set(this._collapsedAreaGroups);
+    if (next.has(collapseKey)) {
+      next.delete(collapseKey);
+    } else {
+      next.add(collapseKey);
+    }
+    this._collapsedAreaGroups = next;
   }
 
   private _renderUngroupedAreaEntities(area: AreaConfig, entities: EntityConfig[]) {

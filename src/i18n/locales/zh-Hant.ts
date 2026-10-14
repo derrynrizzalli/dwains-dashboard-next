@@ -762,6 +762,8 @@ export const zhHant = {
   'domain.cover_gates': '大門',
   'domain.motion': '運動和在場',
   'domain.safety': '安全和警報',
+  'layout.collapse_group': '摺疊群組',
+  'layout.expand_group': '展開群組',
   'device_class.motion': '動作',
   'device_class.moving': '動作',
   'device_class.occupancy': '佔空',

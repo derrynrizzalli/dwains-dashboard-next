@@ -3056,14 +3056,21 @@ export const layoutCardStyles = css`
       --mdc-icon-size: 18px;
     }
 
+    /* When a long group name and the count do not fit on one line, the count
+       wraps to a second line that is cut off, so the name stays readable. */
     .mobile-domain-title-copy {
       min-width: 0;
+      max-height: 24px;
       display: inline-flex;
+      flex-wrap: wrap;
       align-items: baseline;
-      gap: 7px;
+      gap: 10px 7px;
+      overflow: hidden;
     }
 
     .mobile-domain-title-label {
+      min-width: 0;
+      max-width: 100%;
       color: var(--primary-text-color);
       font-size: 18px;
       font-weight: 900;
@@ -3079,6 +3086,60 @@ export const layoutCardStyles = css`
       font-weight: 850;
       line-height: 1.1;
       white-space: nowrap;
+    }
+
+    /* The group title row collapses and expands the group's cards, with the
+       chevron at its end like other expandable sections. */
+    .mobile-domain-title:has(.mobile-domain-collapse) {
+      flex: 1 1 auto;
+    }
+
+    .mobile-domain-collapse {
+      min-width: 0;
+      max-width: 100%;
+      flex: 1 1 auto;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border: 0;
+      border-radius: 8px;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .mobile-domain-collapse:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+
+    .mobile-domain-collapse-icon {
+      flex: 0 0 auto;
+      color: color-mix(in srgb, var(--primary-text-color) 42%, transparent);
+      transition:
+        color 0.18s ease,
+        transform 0.18s ease;
+      --mdc-icon-size: 20px;
+    }
+
+    .mobile-domain-collapse:hover .mobile-domain-collapse-icon {
+      color: var(--primary-text-color);
+    }
+
+    .mobile-domain-collapse[aria-expanded="true"] .mobile-domain-collapse-icon {
+      transform: rotate(180deg);
+    }
+
+    .mobile-domain-group.is-collapsed .mobile-domain-header {
+      margin-bottom: 0;
+    }
+
+    .mobile-entity-rail[hidden] {
+      display: none !important;
     }
 
     .mobile-domain-master {
@@ -7185,6 +7246,7 @@ export const layoutCardStyles = css`
       .mobile-domain-order-button,
       .mobile-domain-drag-handle,
       .mobile-layout-toggle,
+      .mobile-domain-collapse,
       .mobile-domain-master-action,
       .mobile-cover-action,
       .notifications-icon-button,

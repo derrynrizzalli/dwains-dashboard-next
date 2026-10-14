@@ -764,6 +764,8 @@ export const es = {
   'domain.cover_gates': 'Portones',
   'domain.motion': 'Movimiento y presencia',
   'domain.safety': 'Seguridad y alarmas',
+  'layout.collapse_group': 'Contraer grupo',
+  'layout.expand_group': 'Expandir grupo',
   'device_class.motion': 'Movimiento',
   'device_class.moving': 'Movimiento',
   'device_class.occupancy': 'Ocupación',
