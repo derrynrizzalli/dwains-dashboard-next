@@ -818,6 +818,9 @@ export const en = {
   'settings.home_climate_area_outdoor': "Used for outdoor climate",
   'settings.hide_area_name': "Leave the room name out of entity names",
   'settings.hide_area_name_description': "Room pages, the Devices page and device lists already show the room, so \"Living room Ceiling light\" is shown as \"Ceiling light\". Only the whole room name at the start or end of a name is removed, also between brackets.",
+  'settings.show_alarm': "Show the alarm chip on the home page",
+  'settings.show_alarm_description': "Turn this off to hide the alarm chip without removing the selected alarm.",
+  'settings.alarm_hidden': "Alarm hidden",
 
 } as const;
 

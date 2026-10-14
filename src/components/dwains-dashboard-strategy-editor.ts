@@ -584,7 +584,11 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         description: this._t('settings.header_status_description'),
         summary: [
           this._config?.settings?.show_notifications === false ? this._t('settings.notifications_hidden') : this._t('settings.notifications_shown'),
-          this._config?.settings?.alarm_entity_id ? this._t('settings.alarm_selected') : this._t('settings.no_alarm_selected'),
+          !this._config?.settings?.alarm_entity_id
+            ? this._t('settings.no_alarm_selected')
+            : this._config.settings.show_alarm === false
+              ? this._t('settings.alarm_hidden')
+              : this._t('settings.alarm_selected'),
         ],
       },
       {
@@ -1245,6 +1249,16 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       this._t('settings.alarm_description'),
       html`
         <div class="alarm-section">
+          <div class="alarm-toggle">
+            <ha-formfield .label=${this._t('settings.show_alarm')}>
+              <ha-switch
+                .checked=${Boolean(this._config?.settings?.alarm_entity_id) && this._config?.settings?.show_alarm !== false}
+                .disabled=${!this._config?.settings?.alarm_entity_id}
+                @change=${this._toggleAlarmDisplay}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">${this._t('settings.show_alarm_description')}</p>
+          </div>
           <div class="alarm-picker">
             <div class="alarm-picker-header">
               <h4>${this._t('settings.selected_alarm')}</h4>
@@ -4500,11 +4514,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _selectAlarmEntity(entityId: string): void {
+    const settings = this._config!.settings;
     const newConfig: DwainsDashboardConfig = {
       ...this._config!,
       settings: {
-        ...this._config!.settings,
-        alarm_entity_id: entityId
+        ...settings,
+        alarm_entity_id: entityId,
+        // Picking an alarm after it was removed shows the chip again.
+        show_alarm: settings?.alarm_entity_id ? settings.show_alarm : true,
       }
     };
 
@@ -4529,12 +4546,24 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       ...this._config!,
       settings: {
         ...this._config!.settings,
-        alarm_entity_id: undefined
+        alarm_entity_id: undefined,
+        show_alarm: false,
       }
     };
 
     this._fireConfigChanged(newConfig);
   }
+
+  private _toggleAlarmDisplay = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      settings: {
+        ...this._config.settings,
+        show_alarm: Boolean((e.target as any).checked),
+      },
+    });
+  };
 
   private _toggleTimeDisplay(e: Event): void {
     const target = e.target as any;
@@ -6394,6 +6423,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
       .time-toggle,
       .weather-toggle,
+      .alarm-toggle,
       .favorite-suggestions-toggle,
       .hide-unavailable-toggle {
         margin-bottom: 16px;
@@ -6401,6 +6431,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
       .time-toggle ha-formfield,
       .weather-toggle ha-formfield,
+      .alarm-toggle ha-formfield,
       .favorite-suggestions-toggle ha-formfield,
       .hide-unavailable-toggle ha-formfield {
         --mdc-typography-body2-font-size: 14px;

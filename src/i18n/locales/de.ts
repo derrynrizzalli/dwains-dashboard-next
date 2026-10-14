@@ -797,5 +797,8 @@ export const de = {
   'settings.home_climate_area_outdoor': "Für das Außenklima verwendet",
   'settings.hide_area_name': "Raumnamen in Entitätsnamen weglassen",
   'settings.hide_area_name_description': "Raumseiten, die Geräteseite und Gerätelisten zeigen den Raum bereits, daher wird \"Wohnzimmer Deckenlampe\" als \"Deckenlampe\" angezeigt. Nur der ganze Raumname am Anfang oder Ende eines Namens wird entfernt, auch in Klammern.",
+  'settings.show_alarm': "Alarmanzeige auf der Startseite anzeigen",
+  'settings.show_alarm_description': "Ausschalten, um die Alarmanzeige auszublenden, ohne den gewählten Alarm zu entfernen.",
+  'settings.alarm_hidden': "Alarm ausgeblendet",
 
 } as const satisfies TranslationDictionary;

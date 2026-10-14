@@ -1350,7 +1350,7 @@ export class DwainsLayoutCard extends LitElement {
       ...normalizeHomeScenes(config.settings?.home_scenes),
     ]);
     if (config.settings?.weather_entity_id) ids.add(config.settings.weather_entity_id);
-    if (config.settings?.alarm_entity_id) ids.add(config.settings.alarm_entity_id);
+    if (config.settings?.alarm_entity_id && config.settings.show_alarm !== false) ids.add(config.settings.alarm_entity_id);
     const addSensor = (entityId: unknown) => {
       if (typeof entityId === 'string' && entityId) ids.add(entityId);
     };
@@ -6082,7 +6082,8 @@ export class DwainsLayoutCard extends LitElement {
 
   private _getAlarmEntity() {
     const configuredAlarmId = this.config?.settings?.alarm_entity_id;
-    if (!configuredAlarmId) {
+    // Hidden with the switch in the settings, without forgetting the entity.
+    if (!configuredAlarmId || this.config?.settings?.show_alarm === false) {
       return undefined;
     }
 

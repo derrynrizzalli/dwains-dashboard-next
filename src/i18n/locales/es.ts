@@ -797,5 +797,8 @@ export const es = {
   'settings.home_climate_area_outdoor': "Usada para el clima exterior",
   'settings.hide_area_name': "Quitar el nombre de la habitación de los nombres de entidades",
   'settings.hide_area_name_description': "Las páginas de habitaciones, la página de dispositivos y las listas de dispositivos ya muestran la habitación, así que \"Salón Lámpara de techo\" se muestra como \"Lámpara de techo\". Solo se quita el nombre completo de la habitación al principio o al final de un nombre, también entre paréntesis.",
+  'settings.show_alarm': "Mostrar el chip de alarma en la página de inicio",
+  'settings.show_alarm_description': "Desactívalo para ocultar el chip de alarma sin quitar la alarma elegida.",
+  'settings.alarm_hidden': "Alarma oculta",
 
 } as const satisfies TranslationDictionary;

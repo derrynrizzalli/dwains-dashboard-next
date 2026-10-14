@@ -797,5 +797,8 @@ export const fr = {
   'settings.home_climate_area_outdoor': "Utilisée pour le climat extérieur",
   'settings.hide_area_name': "Retirer le nom de la pièce des noms d'entités",
   'settings.hide_area_name_description': "Les pages des pièces, la page Appareils et les listes d'appareils affichent déjà la pièce, donc \"Salon Plafonnier\" devient \"Plafonnier\". Seul le nom complet de la pièce au début ou à la fin d'un nom est retiré, aussi entre parenthèses.",
+  'settings.show_alarm': "Afficher la puce d'alarme sur la page d'accueil",
+  'settings.show_alarm_description': "Désactivez cette option pour masquer la puce d'alarme sans retirer l'alarme choisie.",
+  'settings.alarm_hidden': "Alarme masquée",
 
 } as const satisfies TranslationDictionary;

@@ -820,4 +820,7 @@ export const ptBR = {
   'settings.home_climate_area_outdoor': "Usada para o clima externo",
   'settings.hide_area_name': "Remover o nome do cômodo dos nomes das entidades",
   'settings.hide_area_name_description': "As páginas dos cômodos, a página de dispositivos e as listas de dispositivos já mostram o cômodo, então \"Sala Luz do teto\" aparece como \"Luz do teto\". Só o nome inteiro do cômodo no início ou no fim de um nome é removido, também entre parênteses.",
+  'settings.show_alarm': "Mostrar o indicador do alarme na página inicial",
+  'settings.show_alarm_description': "Desative para ocultar o indicador do alarme sem remover o alarme escolhido.",
+  'settings.alarm_hidden': "Alarme oculto",
 } as const satisfies TranslationDictionary;

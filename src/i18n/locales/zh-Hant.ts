@@ -795,5 +795,8 @@ export const zhHant = {
   'settings.home_climate_area_outdoor': "用於室外氣候",
   'settings.hide_area_name': "在實體名稱中省略房間名稱",
   'settings.hide_area_name_description': "房間頁面、裝置頁面和裝置清單已經顯示房間，因此「客廳 吸頂燈」會顯示為「吸頂燈」。只會移除名稱開頭或結尾的完整房間名稱，括號內的也會移除。",
+  'settings.show_alarm': "在首頁顯示警報標籤",
+  'settings.show_alarm_description': "關閉後會隱藏警報標籤，但不會移除已選擇的警報。",
+  'settings.alarm_hidden': "警報已隱藏",
 
 } as const satisfies TranslationDictionary;

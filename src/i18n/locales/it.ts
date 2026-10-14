@@ -820,4 +820,7 @@ export const it = {
   'settings.home_climate_area_outdoor': "Usata per il clima esterno",
   'settings.hide_area_name': "Togli il nome della stanza dai nomi delle entità",
   'settings.hide_area_name_description': "Le pagine delle stanze, la pagina Dispositivi e gli elenchi dei dispositivi mostrano già la stanza, quindi \"Soggiorno Plafoniera\" diventa \"Plafoniera\". Viene tolto solo il nome intero della stanza all'inizio o alla fine di un nome, anche tra parentesi.",
+  'settings.show_alarm': "Mostra l'indicatore dell'allarme nella Home",
+  'settings.show_alarm_description': "Disattiva per nascondere l'indicatore senza rimuovere l'allarme scelto.",
+  'settings.alarm_hidden': "Allarme nascosto",
 } as const satisfies TranslationDictionary;

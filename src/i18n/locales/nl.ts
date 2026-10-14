@@ -797,5 +797,8 @@ export const nl = {
   'settings.home_climate_area_outdoor': "Gebruikt voor buitenklimaat",
   'settings.hide_area_name': "Kamernaam weglaten uit entiteitnamen",
   'settings.hide_area_name_description': "Kamerpagina's, de Apparatenpagina en apparatenlijsten tonen de kamer al, dus \"Woonkamer Plafondlamp\" wordt \"Plafondlamp\". Alleen de hele kamernaam aan het begin of eind van een naam wordt weggelaten, ook tussen haakjes.",
+  'settings.show_alarm': "Alarmchip tonen op de startpagina",
+  'settings.show_alarm_description': "Zet dit uit om de alarmchip te verbergen zonder het gekozen alarm te verwijderen.",
+  'settings.alarm_hidden': "Alarm verborgen",
 
 } as const satisfies TranslationDictionary;

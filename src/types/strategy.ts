@@ -51,6 +51,8 @@ export interface DwainsDashboardSettings {
   defaultView?: 'home' | 'area';
   weather_entity_id?: string;
   alarm_entity_id?: string;
+  /** Show the alarm chip for `alarm_entity_id`. Default on. */
+  show_alarm?: boolean;
   show_weather?: boolean;
   show_time?: boolean;
   show_notifications?: boolean;
