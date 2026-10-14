@@ -472,6 +472,7 @@ export const fr = {
   'dialog.vibration_sensors': 'Capteurs de vibrations',
   'dialog.no_area': 'Aucune zone',
   'navigation.open_devices': 'Ouvrir la vue Appareils',
+  'devices.area_power_history': 'Historique de puissance : {area}',
   'replacement.title': 'Remplacements de plans',
   'replacement.domain_replacements': 'Remplacements de domaines',
   'replacement.assign': 'Attribuer un remplacement',

@@ -27,19 +27,14 @@ import {
 } from '../utils/device-admission';
 import { ensureBottomNav } from './dwains-bottom-nav';
 import { fireEvent } from './utils/fire-event';
-import {
-  buildHousePowerUsage,
-  formatPowerWatts,
-  type HousePowerUsageSummary,
-  type PowerAreaSummary,
-  type PowerEntitySummary,
-} from '../utils/power-usage';
+import type { HousePowerUsageSummary } from '../utils/power-usage';
 import { subscribeEnergyPowerConfig } from '../utils/energy-prefs';
 import { isRegistryEntryVisible } from '../utils/entity-visibility';
 import { syncHassDarkThemeAttribute } from '../utils/theme';
 import { formatValueWithUnit } from '../utils/unit-format';
 import { TRANSLATIONS_LOADED_EVENT } from '../i18n';
 import './utils/dd-card-host';
+import { sharedHousePowerUsage } from './ui/dd-house-power-panel';
 import { getEntityRegistry } from '../utils/entity-registry';
 import { pageHeaderStyles } from './styles/page-header-styles';
 
@@ -124,7 +119,9 @@ export class DwainsDevicesCard extends LitElement {
     this._syncThemeAttribute();
     ensureBottomNav(hass, this.config?.settings);
     this._syncBottomNavDeviceContext();
-    const hosts = this.renderRoot?.querySelectorAll('dwains-dashboard-next-card-host');
+    const hosts = this.renderRoot?.querySelectorAll(
+      'dwains-dashboard-next-card-host, dwains-dashboard-next-house-power-panel, dwains-dashboard-next-house-power-total'
+    );
     if (hosts) hosts.forEach((host: any) => (host.hass = hass));
   }
   get hass() {
@@ -502,16 +499,7 @@ export class DwainsDevicesCard extends LitElement {
   }
 
   private _energySummary(): HousePowerUsageSummary {
-    return buildHousePowerUsage(this._hass, this.config);
-  }
-
-  /** Short line that says where the house total comes from. */
-  private _energyBasisLabel(summary: HousePowerUsageSummary): string {
-    if (summary.basis === 'energy') {
-      const names = [...new Set(summary.sources.map((source) => source.name))];
-      return this._t('devices.power_based_on', { sensors: names.join(', ') });
-    }
-    return this._tp('devices.live_power_sensor', summary.sensorCount);
+    return sharedHousePowerUsage(this._hass, this.config);
   }
 
   private _maintenanceKind(entityId: string, state: any): MaintenanceItem['kind'] | undefined {
@@ -895,7 +883,7 @@ export class DwainsDevicesCard extends LitElement {
               : this._selectedDomain === MAINTENANCE_KEY
                 ? this._renderMaintenanceView(maintenance)
               : this._selectedDomain === ENERGY_KEY
-                ? this._renderEnergyView(energySummary)
+                ? this._renderEnergyView()
               : this._selectedDomain === DEVICES_OVERVIEW_KEY
                 ? this._renderDevicesOverview(groups)
               : this._renderDeviceView(data)}
@@ -1173,13 +1161,7 @@ export class DwainsDevicesCard extends LitElement {
     `;
   }
 
-  private _renderEnergyView(summary: HousePowerUsageSummary = this._energySummary()) {
-    const topArea = summary.areas[0];
-    const basisLabel = this._energyBasisLabel(summary);
-    const wholeHouseStatisticsEntities = summary.basis === 'energy'
-      ? this._energySourceStatisticsEntities(summary)
-      : this._energyStatisticsEntities(summary.areas.flatMap((area) => area.entities), 8);
-
+  private _renderEnergyView() {
     return html`
       <div class="device-view energy-view">
         ${this._renderDevicePageHeader({
@@ -1190,204 +1172,20 @@ export class DwainsDevicesCard extends LitElement {
           back: true,
           wideActions: true,
           actions: html`
-            <div class="energy-header-total" title=${basisLabel}>
-              <span>${summary.formattedTotal}</span>
-              <small>${summary.basis === 'energy'
-                ? this._t('devices.whole_house')
-                : this._tp('devices.live_power_sensor', summary.sensorCount)}</small>
-            </div>
+            <dwains-dashboard-next-house-power-total
+              .hass=${this._hass}
+              .config=${this.config}
+            ></dwains-dashboard-next-house-power-total>
           `,
         })}
 
-        ${summary.sensorCount
-          ? html`
-              <div class="energy-overview-grid">
-                <section class="energy-overview-card total">
-                  <div class="energy-overview-head">
-                    <span class="energy-overview-icon">
-                      <ha-icon icon="mdi:home-lightning-bolt-outline"></ha-icon>
-                    </span>
-                    <div>
-                      <h2>${this._t('devices.whole_house')}</h2>
-                      <p>${basisLabel}</p>
-                      ${summary.basis === 'energy' && summary.roomSensorCount
-                        ? html`<p>${this._t('devices.power_measured_in_rooms', { value: formatPowerWatts(summary.roomTotalWatts) })}</p>`
-                        : nothing}
-                    </div>
-                    <strong>${summary.formattedTotal}</strong>
-                  </div>
-                  ${this._renderEnergyStatisticsGraph(wholeHouseStatisticsEntities, this._t('devices.whole_house_history'))}
-                </section>
-
-                ${topArea ? html`
-                  <section class="energy-overview-card top-area">
-                    <div class="energy-overview-head">
-                      <span class="energy-overview-icon">
-                        <ha-icon icon=${topArea.icon}></ha-icon>
-                      </span>
-                      <div>
-                        <h2>${this._t('devices.top_area')}</h2>
-                        <p>${topArea.name}</p>
-                      </div>
-                      <strong>${topArea.formattedTotal}</strong>
-                    </div>
-                    <div class="energy-top-entities">
-                      ${topArea.entities.slice(0, 3).map((entity) => this._renderEnergyEntityMini(entity, topArea.totalWatts))}
-                    </div>
-                  </section>
-                ` : nothing}
-              </div>
-
-              <div class="energy-areas-grid">
-                ${repeat(
-                  summary.areas,
-                  (area) => area.areaId,
-                  (area) => this._renderEnergyAreaCard(area)
-                )}
-              </div>
-            `
-          : html`
-              <div class="energy-empty">
-                <ha-icon icon="mdi:flash-off-outline"></ha-icon>
-                <h2>${this._t('devices.no_power_title')}</h2>
-                <p>${this._t('devices.no_power_description')}</p>
-              </div>
-            `}
+        <dwains-dashboard-next-house-power-panel
+          navigable-areas
+          .hass=${this._hass}
+          .config=${this.config}
+          @dd-power-area-selected=${(event: CustomEvent<{ areaId: string }>) => this._navigateToArea(event.detail.areaId)}
+        ></dwains-dashboard-next-house-power-panel>
       </div>
-    `;
-  }
-
-  private _renderEnergyAreaCard(area: PowerAreaSummary) {
-    const canNavigate = !area.areaId.startsWith('__');
-    return html`
-      <section class="energy-area-card">
-        <header class="energy-area-head">
-          <button
-            class="energy-area-title"
-            type="button"
-            @click=${() => canNavigate ? this._navigateToArea(area.areaId) : undefined}
-            ?disabled=${!canNavigate}
-          >
-            <span class="energy-area-icon">
-              <ha-icon icon=${area.icon}></ha-icon>
-            </span>
-            <span>
-              <strong>${area.name}</strong>
-              <small>${this._tp('devices.power_entity', area.entities.length)}</small>
-            </span>
-          </button>
-          <div class="energy-area-total">
-            <span>${area.formattedTotal}</span>
-            <small>${this._t('devices.total_now')}</small>
-          </div>
-        </header>
-
-        ${this._renderEnergyStatisticsGraph(
-          this._energyStatisticsEntities(area.entities, 6),
-          `${area.name} power history`
-        )}
-
-        <div class="energy-entity-list">
-          ${repeat(
-            area.entities,
-            (entity) => entity.entityId,
-            (entity) => this._renderEnergyEntityRow(entity, area.totalWatts)
-          )}
-        </div>
-      </section>
-    `;
-  }
-
-  private _renderEnergyEntityMini(entity: PowerEntitySummary, areaTotalWatts: number) {
-    const percentage = this._energyEntityPercentage(entity, areaTotalWatts);
-    return html`
-      <button
-        class="energy-entity-mini"
-        type="button"
-        style=${`--power-width: ${percentage}%`}
-        @click=${() => this._showMoreInfo(entity.entityId)}
-      >
-        <span>${entity.name}</span>
-        <strong>${entity.formatted}</strong>
-      </button>
-    `;
-  }
-
-  private _renderEnergyEntityRow(entity: PowerEntitySummary, areaTotalWatts: number) {
-    const percentage = this._energyEntityPercentage(entity, areaTotalWatts);
-    return html`
-      <button
-        class="energy-entity-row"
-        type="button"
-        style=${`--power-width: ${percentage}%`}
-        @click=${() => this._showMoreInfo(entity.entityId)}
-      >
-        <span class="energy-entity-icon">
-          <ha-icon icon=${entity.icon}></ha-icon>
-        </span>
-        <span class="energy-entity-copy">
-          <strong>${entity.name}</strong>
-          <small>${entity.areaName}</small>
-          <span class="energy-entity-bar" aria-hidden="true"><span></span></span>
-        </span>
-        <span class="energy-entity-value">${entity.formatted}</span>
-      </button>
-    `;
-  }
-
-  private _energyEntityPercentage(entity: PowerEntitySummary, areaTotalWatts: number): number {
-    if (areaTotalWatts <= 0) return 0;
-    return Math.max(4, Math.min(100, Math.round((entity.watts / areaTotalWatts) * 100)));
-  }
-
-  private _energyStatisticsEntities(
-    entities: PowerEntitySummary[],
-    limit: number
-  ): Array<{ entity: string; name: string }> {
-    return entities
-      .filter((entity) => ['measurement', 'total', 'total_increasing'].includes(entity.stateClass || ''))
-      .sort((a, b) => b.watts - a.watts)
-      .slice(0, limit)
-      .map((entity) => ({ entity: entity.entityId, name: entity.name }));
-  }
-
-  private _energySourceStatisticsEntities(summary: HousePowerUsageSummary): Array<{ entity: string; name: string }> {
-    const seen = new Set<string>();
-    return summary.sources
-      .filter((source) => {
-        if (seen.has(source.entityId)) return false;
-        seen.add(source.entityId);
-        const stateClass = String(this._hass?.states?.[source.entityId]?.attributes?.state_class || '');
-        return ['measurement', 'total', 'total_increasing'].includes(stateClass);
-      })
-      .map((source) => ({ entity: source.entityId, name: source.name }));
-  }
-
-  private _renderEnergyStatisticsGraph(
-    entities: Array<{ entity: string; name: string }>,
-    label: string
-  ) {
-    if (!entities.length) return nothing;
-
-    const graphConfig = {
-      type: 'statistics-graph',
-      entities,
-      days_to_show: 1,
-      period: '5minute',
-      stat_types: ['mean'],
-      chart_type: 'line',
-      hide_legend: true,
-      fit_y_data: true,
-      min_y_axis: 0,
-    };
-
-    return html`
-      <dwains-dashboard-next-card-host
-        class="energy-statistics-card"
-        aria-label=${label}
-        .hass=${this._hass}
-        .config=${graphConfig}
-      ></dwains-dashboard-next-card-host>
     `;
   }
 
@@ -2330,349 +2128,6 @@ export class DwainsDevicesCard extends LitElement {
       --domain-color: #d88e20;
     }
 
-    .energy-header-total {
-      box-sizing: border-box;
-      min-height: 52px;
-      padding: 7px 14px;
-      display: grid;
-      align-content: center;
-      justify-items: end;
-      gap: 2px;
-      border-radius: 14px;
-      background: color-mix(in srgb, var(--domain-color) 13%, var(--card-background-color));
-    }
-
-    .energy-header-total span {
-      color: var(--primary-text-color);
-      font-size: 22px;
-      font-weight: 800;
-      line-height: 1.05;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .energy-header-total small,
-    .energy-overview-head p,
-    .energy-area-title small,
-    .energy-area-total small,
-    .energy-entity-copy small {
-      color: var(--secondary-text-color);
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-
-    .energy-overview-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(260px, 1fr));
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-
-    .energy-overview-card,
-    .energy-area-card {
-      border: 1px solid var(--divider-color);
-      border-radius: 12px;
-      background: var(--card-background-color);
-      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
-    }
-
-    .energy-overview-card {
-      padding: 14px;
-      overflow: hidden;
-    }
-
-    .energy-overview-head {
-      display: grid;
-      grid-template-columns: 42px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .energy-overview-icon,
-    .energy-area-icon,
-    .energy-entity-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-      background: color-mix(in srgb, var(--domain-color) 12%, transparent);
-      color: var(--domain-color);
-    }
-
-    .energy-overview-icon {
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-    }
-
-    .energy-overview-icon ha-icon {
-      --mdc-icon-size: 24px;
-    }
-
-    .energy-overview-head h2 {
-      margin: 0;
-      color: var(--primary-text-color);
-      font-size: 15px;
-      font-weight: 850;
-      line-height: 1.1;
-    }
-
-    .energy-overview-head p {
-      margin: 4px 0 0;
-      overflow-wrap: anywhere;
-    }
-
-    .energy-overview-head strong {
-      color: var(--primary-text-color);
-      font-size: 22px;
-      font-weight: 950;
-      white-space: nowrap;
-    }
-
-    .energy-statistics-card {
-      display: block;
-      min-height: 150px;
-      margin-top: 12px;
-      border-radius: 12px;
-      overflow: hidden;
-      background: color-mix(in srgb, var(--domain-color) 4%, transparent);
-      --ha-card-background: transparent;
-      --ha-card-box-shadow: none;
-      --ha-card-border-width: 0;
-      --ha-card-border-radius: 12px;
-    }
-
-    .energy-top-entities {
-      margin-top: 12px;
-      display: grid;
-      gap: 7px;
-    }
-
-    .energy-entity-mini {
-      min-height: 30px;
-      padding: 0 9px;
-      border: 0;
-      border-radius: 9px;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 8px;
-      background:
-        linear-gradient(90deg,
-          color-mix(in srgb, var(--domain-color) 16%, transparent) 0 var(--power-width),
-          var(--secondary-background-color) var(--power-width) 100%);
-      color: var(--primary-text-color);
-      cursor: pointer;
-      text-align: left;
-      font: inherit;
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .energy-entity-mini span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .energy-entity-mini strong {
-      font-size: 12px;
-      font-weight: 900;
-      white-space: nowrap;
-    }
-
-    .energy-areas-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-      gap: 12px;
-    }
-
-    .energy-area-card {
-      padding: 14px;
-      overflow: hidden;
-    }
-
-    .energy-area-head {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .energy-area-title {
-      min-width: 0;
-      padding: 0;
-      border: 0;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      background: transparent;
-      color: var(--primary-text-color);
-      cursor: pointer;
-      text-align: left;
-      font: inherit;
-    }
-
-    .energy-area-title:disabled {
-      cursor: default;
-    }
-
-    .energy-area-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-    }
-
-    .energy-area-icon ha-icon {
-      --mdc-icon-size: 22px;
-    }
-
-    .energy-area-title strong {
-      display: block;
-      overflow: hidden;
-      color: var(--primary-text-color);
-      font-size: 16px;
-      font-weight: 900;
-      line-height: 1.12;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .energy-area-title small {
-      display: block;
-      margin-top: 3px;
-    }
-
-    .energy-area-total {
-      display: grid;
-      justify-items: end;
-      gap: 2px;
-    }
-
-    .energy-area-total span {
-      color: var(--primary-text-color);
-      font-size: 20px;
-      font-weight: 950;
-      line-height: 1;
-      white-space: nowrap;
-    }
-
-    .energy-entity-list {
-      display: grid;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .energy-entity-row {
-      min-height: 58px;
-      padding: 9px 10px;
-      border: 1px solid var(--divider-color);
-      border-radius: 10px;
-      display: grid;
-      grid-template-columns: 36px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 10px;
-      background: var(--primary-background-color);
-      color: var(--primary-text-color);
-      cursor: pointer;
-      text-align: left;
-      font: inherit;
-      transition:
-        border-color 0.16s ease,
-        transform 0.16s ease,
-        box-shadow 0.16s ease;
-    }
-
-    .energy-entity-row:hover {
-      border-color: color-mix(in srgb, var(--domain-color) 26%, var(--divider-color));
-      box-shadow: 0 12px 22px rgba(15, 23, 42, 0.08);
-      transform: translateY(-1px);
-    }
-
-    .energy-entity-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-    }
-
-    .energy-entity-icon ha-icon {
-      --mdc-icon-size: 20px;
-    }
-
-    .energy-entity-copy {
-      min-width: 0;
-      display: grid;
-      gap: 3px;
-    }
-
-    .energy-entity-copy strong {
-      overflow: hidden;
-      color: var(--primary-text-color);
-      font-size: 13px;
-      font-weight: 850;
-      line-height: 1.1;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .energy-entity-bar {
-      position: relative;
-      height: 5px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--domain-color) 10%, var(--secondary-background-color));
-    }
-
-    .energy-entity-bar span {
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: var(--power-width, 0%);
-      min-width: 4px;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--domain-color), #f5c85b);
-    }
-
-    .energy-entity-value {
-      color: var(--primary-text-color);
-      font-size: 13px;
-      font-weight: 900;
-      white-space: nowrap;
-    }
-
-    .energy-empty {
-      min-height: 280px;
-      padding: 32px;
-      border: 1px dashed var(--divider-color);
-      border-radius: 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: var(--card-background-color);
-      color: var(--secondary-text-color);
-      text-align: center;
-    }
-
-    .energy-empty ha-icon {
-      --mdc-icon-size: 34px;
-      color: var(--domain-color);
-    }
-
-    .energy-empty h2 {
-      margin: 4px 0 0;
-      color: var(--primary-text-color);
-      font-size: 18px;
-      font-weight: 850;
-    }
-
-    .energy-empty p {
-      max-width: 430px;
-      margin: 0;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
     /* Domain (per area) groups */
     .domain-group {
       background: var(--card-background-color);
@@ -3064,41 +2519,6 @@ export class DwainsDevicesCard extends LitElement {
         min-height: 62px;
       }
 
-      .energy-header-total {
-        justify-items: start;
-      }
-
-      .energy-overview-grid,
-      .energy-areas-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .energy-overview-head,
-      .energy-area-head {
-        grid-template-columns: 40px minmax(0, 1fr);
-      }
-
-      .energy-overview-head strong,
-      .energy-area-total {
-        grid-column: 1 / -1;
-        justify-self: stretch;
-        justify-items: start;
-        margin-top: 4px;
-      }
-
-      .energy-area-card,
-      .energy-overview-card {
-        border-radius: 10px;
-      }
-
-      .energy-entity-row {
-        grid-template-columns: 36px minmax(0, 1fr);
-      }
-
-      .energy-entity-value {
-        grid-column: 2;
-        justify-self: start;
-      }
     }
   `, pageHeaderStyles];
 }

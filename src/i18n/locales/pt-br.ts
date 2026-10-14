@@ -488,6 +488,7 @@ export const ptBR = {
   'dialog.vibration_sensors': 'Sensores de vibração',
   'dialog.no_area': 'Sem área',
   'navigation.open_devices': 'Abrir a visualização de dispositivos',
+  'devices.area_power_history': 'Histórico de potência: {area}',
 
   'replacement.title': 'Substituições de blueprint',
   'replacement.domain_replacements': 'Substituições por domínio',

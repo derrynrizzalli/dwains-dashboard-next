@@ -472,6 +472,7 @@ export const nl = {
   'dialog.vibration_sensors': 'Trillingssensoren',
   'dialog.no_area': 'Geen gebied',
   'navigation.open_devices': 'Apparatenweergave openen',
+  'devices.area_power_history': 'Vermogensverloop: {area}',
   'replacement.title': 'Vervangingen van blauwdrukken',
   'replacement.domain_replacements': 'Domeinvervangingen',
   'replacement.assign': 'Vervanging toewijzen',

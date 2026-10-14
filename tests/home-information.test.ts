@@ -6,8 +6,12 @@ import {
   isDestructiveBulkAction,
   orderRoomGroups,
   personPresence,
+  pickEnergySourceStatisticsEntities,
+  pickPowerStatisticsEntities,
+  powerSharePercentage,
   roomActionNeedsConfirmation,
 } from '../src/utils/home-information';
+import { entityState, hassWithStates } from './helpers';
 
 describe('orderRoomGroups', () => {
   const groups = [
@@ -103,5 +107,44 @@ describe('personPresence', () => {
     expect(personPresence('unknown')).toBe('unknown');
     expect(personPresence('unavailable')).toBe('unknown');
     expect(personPresence(undefined)).toBe('unknown');
+  });
+});
+
+describe('statistics entities', () => {
+  const entities = [
+    { entityId: 'sensor.tv', name: 'TV', watts: 80, stateClass: 'measurement' },
+    { entityId: 'sensor.oven', name: 'Oven', watts: 2000, stateClass: 'measurement' },
+    { entityId: 'sensor.no_stats', name: 'No stats', watts: 5000 },
+    { entityId: 'sensor.fridge', name: 'Fridge', watts: 120, stateClass: 'total' },
+  ];
+
+  it('keeps sensors with statistics, highest first, up to the limit', () => {
+    expect(pickPowerStatisticsEntities(entities, 2)).toEqual([
+      { entity: 'sensor.oven', name: 'Oven' },
+      { entity: 'sensor.fridge', name: 'Fridge' },
+    ]);
+  });
+
+  it('picks energy sources once and only with statistics', () => {
+    const hass = hassWithStates([
+      entityState('sensor.grid', '300', { state_class: 'measurement' }),
+      entityState('sensor.solar', '100'),
+    ]);
+    expect(
+      pickEnergySourceStatisticsEntities(
+        [
+          { entityId: 'sensor.grid', name: 'Grid' },
+          { entityId: 'sensor.grid', name: 'Grid' },
+          { entityId: 'sensor.solar', name: 'Solar' },
+        ],
+        hass.states
+      )
+    ).toEqual([{ entity: 'sensor.grid', name: 'Grid' }]);
+  });
+
+  it('computes share bar widths', () => {
+    expect(powerSharePercentage(50, 100)).toBe(50);
+    expect(powerSharePercentage(1, 1000)).toBe(4);
+    expect(powerSharePercentage(10, 0)).toBe(0);
   });
 });

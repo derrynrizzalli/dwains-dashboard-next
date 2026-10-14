@@ -362,3 +362,71 @@ function normalizeStateClass(stateClass: unknown): string | undefined {
   const normalized = String(stateClass || '').trim().toLowerCase();
   return ['measurement', 'total', 'total_increasing'].includes(normalized) ? normalized : undefined;
 }
+
+// Power sensors per states object, shared by every memo below.
+const powerStatesCache = new WeakMap<object, readonly HassEntity[]>();
+
+/** Sensors that report power (a power unit or the power device class). */
+function getPowerStates(states: HomeAssistant['states']): readonly HassEntity[] {
+  let powerStates = powerStatesCache.get(states);
+  if (!powerStates) {
+    powerStates = getDomainStates(states, 'sensor').filter((state) =>
+      Boolean(normalizePowerUnit(state.attributes?.unit_of_measurement)) ||
+      String(state.attributes?.device_class || '').toLowerCase() === 'power'
+    );
+    powerStatesCache.set(states, powerStates);
+  }
+  return powerStates;
+}
+
+function sameStates(left: readonly HassEntity[], right: readonly HassEntity[]): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+/**
+ * `buildHousePowerUsage` that only recomputes when something it reads
+ * changed: the config, the registries, the energy settings or one of the
+ * power sensors. Home Assistant replaces `hass` on every state change, most
+ * of which have nothing to do with power. Each caller keeps its own memo.
+ */
+export function createHousePowerUsageMemo(): (
+  hass: HomeAssistant | undefined,
+  config: DwainsDashboardConfig | undefined
+) => HousePowerUsageSummary {
+  let last:
+    | {
+        config: DwainsDashboardConfig | undefined;
+        registry: object;
+        devices: unknown;
+        energy: EnergyPowerConfig | null | undefined;
+        powerStates: readonly HassEntity[];
+        summary: HousePowerUsageSummary;
+      }
+    | undefined;
+
+  return (hass, config) => {
+    const energy = getEnergyPowerConfig(hass);
+    const registry = getEntityRegistry(hass);
+    const devices = hass?.devices;
+    const powerStates = hass?.states ? getPowerStates(hass.states) : [];
+
+    if (
+      last &&
+      last.config === config &&
+      last.registry === registry &&
+      last.devices === devices &&
+      last.energy === energy &&
+      sameStates(last.powerStates, powerStates)
+    ) {
+      return last.summary;
+    }
+
+    const summary = buildHousePowerUsage(hass, config, energy);
+    last = { config, registry, devices, energy, powerStates, summary };
+    return summary;
+  };
+}

@@ -472,6 +472,7 @@ export const es = {
   'dialog.vibration_sensors': 'Sensores de vibración',
   'dialog.no_area': 'Sin área',
   'navigation.open_devices': 'Abrir la vista Dispositivos',
+  'devices.area_power_history': 'Historial de potencia: {area}',
   'replacement.title': 'Reemplazos de planos',
   'replacement.domain_replacements': 'Reemplazos de dominio',
   'replacement.assign': 'Asignar reemplazo',

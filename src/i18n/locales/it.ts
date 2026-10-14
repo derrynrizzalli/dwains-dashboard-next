@@ -488,6 +488,7 @@ export const it = {
   'dialog.vibration_sensors': 'Sensori di vibrazione',
   'dialog.no_area': 'Nessuna stanza',
   'navigation.open_devices': 'Apri la vista Dispositivi',
+  'devices.area_power_history': 'Cronologia della potenza: {area}',
 
   'replacement.title': 'Sostituzioni blueprint',
   'replacement.domain_replacements': 'Sostituzioni per dominio',

@@ -1,5 +1,8 @@
+import type { HomeAssistant } from '../types/home-assistant';
+import type { PowerEntitySummary, PowerSourceSummary } from './power-usage';
+
 // Pure helpers for the Home information popups (people, climate and device
-// groups). The dialogs only render what these return.
+// groups) and the house power panel. The dialogs only render what these return.
 
 /** Service calls the room and "all" actions of a popup can run. */
 export type BulkDomainAction = 'turn_on' | 'turn_off' | 'open_cover' | 'close_cover' | 'lock' | 'unlock';
@@ -126,4 +129,53 @@ export function personPresence(state: string | null | undefined): PersonPresence
   if (value === 'home') return 'home';
   if (value === 'not_home') return 'away';
   return 'zone';
+}
+
+/** An entity in a statistics-graph card config. */
+export interface StatisticsGraphEntity {
+  entity: string;
+  name: string;
+}
+
+/** State classes Home Assistant keeps long term statistics for. */
+const STATISTICS_STATE_CLASSES: ReadonlySet<string> = new Set(['measurement', 'total', 'total_increasing']);
+
+/**
+ * The power sensors to draw in a statistics graph: only sensors with long
+ * term statistics, the highest readings first, at most `limit`.
+ */
+export function pickPowerStatisticsEntities(
+  entities: readonly Pick<PowerEntitySummary, 'entityId' | 'name' | 'watts' | 'stateClass'>[],
+  limit: number
+): StatisticsGraphEntity[] {
+  return entities
+    .filter((entity) => STATISTICS_STATE_CLASSES.has(entity.stateClass || ''))
+    .sort((a, b) => b.watts - a.watts)
+    .slice(0, Math.max(0, limit))
+    .map((entity) => ({ entity: entity.entityId, name: entity.name }));
+}
+
+/**
+ * The energy settings sensors (grid, solar, battery) for the whole house
+ * graph, once each and only when they have long term statistics.
+ */
+export function pickEnergySourceStatisticsEntities(
+  sources: readonly Pick<PowerSourceSummary, 'entityId' | 'name'>[],
+  states: HomeAssistant['states'] | undefined
+): StatisticsGraphEntity[] {
+  const seen = new Set<string>();
+  const picked: StatisticsGraphEntity[] = [];
+  for (const source of sources) {
+    if (seen.has(source.entityId)) continue;
+    seen.add(source.entityId);
+    const stateClass = String(states?.[source.entityId]?.attributes?.state_class || '').toLowerCase();
+    if (STATISTICS_STATE_CLASSES.has(stateClass)) picked.push({ entity: source.entityId, name: source.name });
+  }
+  return picked;
+}
+
+/** Width of a share bar: the share of the total, at least 4% so it stays visible. */
+export function powerSharePercentage(watts: number, totalWatts: number): number {
+  if (!(totalWatts > 0)) return 0;
+  return Math.max(4, Math.min(100, Math.round((watts / totalWatts) * 100)));
 }
