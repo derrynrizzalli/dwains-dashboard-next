@@ -673,7 +673,7 @@ export const ru = {
   'summary.device_to_add.other': '{count} устройства для добавления',
 
   'support.title': 'Поддержать Dwains Dashboard',
-  'support.description': 'Я создаю Dwains Dashboard — бесплатный проект с открытым исходным кодом — в свободное время параллельно с основной работой. Мой основной проект — SmartHomeShop.io, где я разрабатываю аппаратные решения для Home Assistant и ESPHome.',
+  'support.description': 'Я создаю Dwains Dashboard как бесплатный проект с открытым исходным кодом в свободное время, параллельно с основной работой. Мой главный проект называется SmartHomeShop.io: там я разрабатываю аппаратные решения для Home Assistant и ESPHome.',
   'support.donation': 'Буду благодарен за пожертвование',
   'support.github': 'GitHub Sponsor',
   'support.buy_coffee': 'Угостить кофе',
