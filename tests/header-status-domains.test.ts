@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { getGroupMemberIds, getStatusDomains, shouldSkipGroupEntity } from '../src/utils/header-status-domains';
+import {
+  coverStatusKind,
+  getGroupMemberIds,
+  getStatusDomains,
+  isCoverStatusActive,
+  shouldSkipGroupEntity,
+} from '../src/utils/header-status-domains';
 import { isEntityVisibleInArea, isRegistryEntryVisible } from '../src/utils/entity-visibility';
 import { AreaEntityResolver } from '../src/utils/area-entity-resolver';
 import type { HassEntity } from '../src/types/home-assistant';
@@ -22,8 +28,8 @@ function baseConfig(overrides: Partial<DwainsDashboardConfig> = {}): DwainsDashb
   } as DwainsDashboardConfig;
 }
 
-function countFor(domains: ReturnType<typeof getStatusDomains>, domain: string): number {
-  return domains.find((item) => item.domain === domain)?.count ?? 0;
+function coverChip(domains: ReturnType<typeof getStatusDomains>, kind: string) {
+  return domains.find((item) => item.domain === 'cover' && item.statusKind === kind);
 }
 
 describe('isRegistryEntryVisible', () => {
@@ -144,30 +150,167 @@ describe('group entities', () => {
 
   it('does not count a cover group on top of its members', () => {
     const hass = hassWithStates([
-      entityState('cover.all_blinds', 'open', { entity_id: ['cover.left', 'cover.right'] }),
-      entityState('cover.left', 'open'),
-      entityState('cover.right', 'open'),
+      entityState('cover.all_blinds', 'closed', { entity_id: ['cover.left', 'cover.right'] }),
+      entityState('cover.left', 'closed'),
+      entityState('cover.right', 'closed'),
     ]);
-    const covers = getStatusDomains(hass, config).find((item) => item.domain === 'cover');
-    expect(covers?.count).toBe(2);
-    expect(covers?.entities).toEqual(['cover.left', 'cover.right']);
+    const shading = coverChip(getStatusDomains(hass, config), 'shading');
+    expect(shading?.count).toBe(2);
+    expect(shading?.entities).toEqual(['cover.left', 'cover.right']);
+  });
+
+  it('skips a group inside its own kind', () => {
+    const hass = hassWithStates([
+      entityState('cover.all_blinds', 'open', {
+        device_class: 'window',
+        entity_id: ['cover.left', 'cover.right'],
+      }),
+      entityState('cover.left', 'open', { device_class: 'window' }),
+      entityState('cover.right', 'closed', { device_class: 'window' }),
+    ]);
+    const windows = coverChip(getStatusDomains(hass, config), 'window');
+    expect(windows?.count).toBe(1);
+    expect(windows?.entities).toEqual(['cover.left']);
   });
 
   it('counts a group whose members are not shown on the dashboard', () => {
     const hass = hassWithStates([
-      entityState('cover.garage_group', 'open', { entity_id: ['cover.garage_door'] }),
-      entityState('cover.garage_door', 'open'),
+      entityState('cover.garage_group', 'open', { device_class: 'garage', entity_id: ['cover.garage_door'] }),
+      entityState('cover.garage_door', 'open', { device_class: 'garage' }),
     ]);
-    expect(countFor(getStatusDomains(hass, config), 'cover')).toBe(1);
+    expect(coverChip(getStatusDomains(hass, config), 'gate')?.entities).toEqual(['cover.garage_group']);
   });
 
   it('keeps skipping the group when a member becomes unavailable', () => {
     const hass = hassWithStates([
-      entityState('cover.all_blinds', 'open', { entity_id: ['cover.left', 'cover.right'] }),
-      entityState('cover.left', 'open'),
+      entityState('cover.all_blinds', 'closed', { entity_id: ['cover.left', 'cover.right'] }),
+      entityState('cover.left', 'closed'),
       entityState('cover.right', 'unavailable'),
     ]);
-    const covers = getStatusDomains(hass, config).find((item) => item.domain === 'cover');
-    expect(covers?.entities).toEqual(['cover.left']);
+    expect(coverChip(getStatusDomains(hass, config), 'shading')?.entities).toEqual(['cover.left']);
+  });
+});
+
+describe('cover status kinds', () => {
+  it('sorts covers by device class', () => {
+    expect(coverStatusKind(entityState('cover.a', 'open', { device_class: 'window' }))).toBe('window');
+    expect(coverStatusKind(entityState('cover.a', 'open', { device_class: 'door' }))).toBe('door');
+    expect(coverStatusKind(entityState('cover.a', 'open', { device_class: 'garage' }))).toBe('gate');
+    expect(coverStatusKind(entityState('cover.a', 'open', { device_class: 'garage_door' }))).toBe('gate');
+    expect(coverStatusKind(entityState('cover.a', 'open', { device_class: 'gate' }))).toBe('gate');
+    expect(coverStatusKind(entityState('cover.a', 'open', { device_class: 'blind' }))).toBe('shading');
+    expect(coverStatusKind(entityState('cover.a', 'open', { device_class: 'awning' }))).toBe('shading');
+    expect(coverStatusKind(entityState('cover.a', 'open'))).toBe('shading');
+    expect(coverStatusKind(undefined)).toBe('shading');
+  });
+
+  it('counts windows, doors and gates while they are open', () => {
+    for (const device_class of ['window', 'door', 'gate']) {
+      expect(isCoverStatusActive(entityState('cover.a', 'open', { device_class })), device_class).toBe(true);
+      expect(isCoverStatusActive(entityState('cover.a', 'opening', { device_class })), device_class).toBe(true);
+      expect(isCoverStatusActive(entityState('cover.a', 'closed', { device_class })), device_class).toBe(false);
+      expect(isCoverStatusActive(entityState('cover.a', 'closing', { device_class, current_position: 20 })), device_class)
+        .toBe(true);
+      expect(isCoverStatusActive(entityState('cover.a', 'closed', { device_class, current_position: 0 })), device_class)
+        .toBe(false);
+    }
+  });
+
+  it('counts shading while it is (partly) closed', () => {
+    expect(isCoverStatusActive(entityState('cover.a', 'closed', { device_class: 'shutter' }))).toBe(true);
+    expect(isCoverStatusActive(entityState('cover.a', 'closing', { device_class: 'blind' }))).toBe(true);
+    expect(isCoverStatusActive(entityState('cover.a', 'open', { device_class: 'curtain' }))).toBe(false);
+    expect(isCoverStatusActive(entityState('cover.a', 'open', { current_position: 60 }))).toBe(true);
+    expect(isCoverStatusActive(entityState('cover.a', 'open', { current_position: 100 }))).toBe(false);
+    // Without a position attribute only the state counts.
+    expect(isCoverStatusActive(entityState('cover.a', 'open', { current_position: null }))).toBe(false);
+  });
+
+  it('counts awnings while they are rolled out', () => {
+    expect(isCoverStatusActive(entityState('cover.a', 'open', { device_class: 'awning' }))).toBe(true);
+    expect(isCoverStatusActive(entityState('cover.a', 'closed', { device_class: 'awning' }))).toBe(false);
+    expect(isCoverStatusActive(entityState('cover.a', 'closed', { device_class: 'awning', current_position: 30 })))
+      .toBe(true);
+  });
+
+  it('ignores unavailable and unknown covers', () => {
+    expect(isCoverStatusActive(entityState('cover.a', 'unavailable', { device_class: 'window' }))).toBe(false);
+    expect(isCoverStatusActive(entityState('cover.a', 'unknown', { current_position: 50 }))).toBe(false);
+    expect(isCoverStatusActive(undefined)).toBe(false);
+  });
+
+  const config = baseConfig({
+    entities: [
+      'cover.kitchen_window', 'cover.bathroom_window', 'cover.front_door', 'cover.garage', 'cover.driveway',
+      'cover.living_blind', 'cover.bedroom_shutter', 'cover.terrace_awning', 'cover.test_blind',
+    ].map((entity_id) => ({ entity_id, area_id: 'living' })),
+  });
+
+  it('shows one chip per kind with the active covers', () => {
+    const hass = hassWithStates([
+      entityState('cover.kitchen_window', 'open', { device_class: 'window' }),
+      entityState('cover.bathroom_window', 'closed', { device_class: 'window', current_position: 30 }),
+      entityState('cover.front_door', 'closed', { device_class: 'door' }),
+      entityState('cover.garage', 'open', { device_class: 'garage' }),
+      entityState('cover.driveway', 'opening', { device_class: 'gate' }),
+      entityState('cover.living_blind', 'closed', { device_class: 'blind' }),
+      entityState('cover.bedroom_shutter', 'open', { device_class: 'shutter', current_position: 100 }),
+      entityState('cover.terrace_awning', 'open', { device_class: 'awning' }),
+      entityState('cover.test_blind', 'open', { current_position: 40 }),
+    ]);
+    const domains = getStatusDomains(hass, config);
+    const covers = domains.filter((item) => item.domain === 'cover');
+
+    expect(covers.map((item) => item.statusKind)).toEqual(['window', 'gate', 'shading']);
+    expect(coverChip(domains, 'window')).toMatchObject({
+      count: 2,
+      name: 'Windows',
+      icon: 'mdi:window-open',
+      entities: ['cover.kitchen_window', 'cover.bathroom_window'],
+    });
+    expect(coverChip(domains, 'door')).toBeUndefined();
+    expect(coverChip(domains, 'gate')).toMatchObject({
+      count: 2,
+      name: 'Gates',
+      entities: ['cover.garage', 'cover.driveway'],
+    });
+    expect(coverChip(domains, 'shading')).toMatchObject({
+      count: 3,
+      name: 'Shading',
+      entities: ['cover.living_blind', 'cover.terrace_awning', 'cover.test_blind'],
+    });
+    // No device class on the chips, so View all opens the covers group.
+    expect(covers.every((item) => item.deviceClass === undefined)).toBe(true);
+  });
+
+  it('shows a door chip for open door covers', () => {
+    const hass = hassWithStates([entityState('cover.front_door', 'open', { device_class: 'door' })]);
+    expect(coverChip(getStatusDomains(hass, config), 'door')).toMatchObject({
+      count: 1,
+      name: 'Doors',
+      icon: 'mdi:door-open',
+    });
+  });
+});
+
+describe('status chip icons', () => {
+  const config = baseConfig({
+    entities: ['window', 'door', 'smoke', 'moisture', 'tamper']
+      .map((name) => ({ entity_id: `binary_sensor.${name}`, area_id: 'living' })),
+  });
+
+  it('uses the active icon of alert sensors', () => {
+    const hass = hassWithStates(['window', 'door', 'smoke', 'moisture', 'tamper']
+      .map((name) => entityState(`binary_sensor.${name}`, 'on', { device_class: name })));
+    const icons = Object.fromEntries(getStatusDomains(hass, config)
+      .filter((item) => item.domain === 'binary_sensor')
+      .map((item) => [item.deviceClass, item.icon]));
+    expect(icons).toEqual({
+      window: 'mdi:window-open',
+      door: 'mdi:door-open',
+      smoke: 'mdi:smoke-detector-alert',
+      moisture: 'mdi:water-alert',
+      tamper: 'mdi:lock-alert',
+    });
   });
 });

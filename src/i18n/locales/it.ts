@@ -287,6 +287,13 @@ export const it = {
   'status.tamper_detected': '{count} manomissione rilevata',
   'status.vibration_detected': '{count} vibrazione rilevata',
   'status.safety_active': '{count} avviso di sicurezza attivo',
+  'status.gate_open.one': '{count} cancello aperto',
+  'status.gate_open.other': '{count} cancelli aperti',
+  'status.shading_closed.one': '{count} schermatura chiusa',
+  'status.shading_closed.other': '{count} schermature chiuse',
+  'status.scroll_previous': 'Stati precedenti',
+  'status.scroll_next': 'Altri stati',
+  'sidebar.more_status': 'Altri stati attivi',
 
   'action.turn_on': 'Accendi',
   'action.activate': 'Attiva',

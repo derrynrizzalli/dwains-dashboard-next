@@ -285,6 +285,13 @@ export const en = {
   'status.tamper_detected': '{count} tamper detected',
   'status.vibration_detected': '{count} vibration detected',
   'status.safety_active': '{count} safety active',
+  'status.gate_open.one': '{count} gate open',
+  'status.gate_open.other': '{count} gates open',
+  'status.shading_closed.one': '{count} shading closed',
+  'status.shading_closed.other': '{count} shading closed',
+  'status.scroll_previous': 'Previous status',
+  'status.scroll_next': 'More status',
+  'sidebar.more_status': 'More active status',
 
   'action.turn_on': 'Turn on',
   'action.activate': 'Activate',

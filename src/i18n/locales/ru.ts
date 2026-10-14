@@ -287,6 +287,13 @@ export const ru = {
   'status.tamper_detected': 'Обнаружено вскрытие: {count}',
   'status.vibration_detected': 'Обнаружено вибрации: {count}',
   'status.safety_active': 'Активных защитных устройств: {count}',
+  'status.gate_open.one': 'Открытые ворота: {count}',
+  'status.gate_open.other': 'Открытые ворота: {count}',
+  'status.shading_closed.one': 'Солнцезащита закрыта: {count}',
+  'status.shading_closed.other': 'Солнцезащита закрыта: {count}',
+  'status.scroll_previous': 'Предыдущие статусы',
+  'status.scroll_next': 'Ещё статусы',
+  'sidebar.more_status': 'Другие активные статусы',
 
   'action.turn_on': 'Включить',
   'action.activate': 'Активировать',
@@ -885,4 +892,8 @@ export const ru = {
   'summary.update_available.many': 'Доступно обновлений: {count}',
   'summary.device_to_add.few': '{count} устройства для добавления',
   'summary.device_to_add.many': '{count} устройств для добавления',
+  'status.gate_open.few': 'Открытые ворота: {count}',
+  'status.gate_open.many': 'Открытые ворота: {count}',
+  'status.shading_closed.few': 'Солнцезащита закрыта: {count}',
+  'status.shading_closed.many': 'Солнцезащита закрыта: {count}',
 } as const satisfies TranslationDictionary;

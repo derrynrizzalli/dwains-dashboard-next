@@ -287,6 +287,13 @@ export const ptBR = {
   'status.tamper_detected': '{count} violação detectada',
   'status.vibration_detected': '{count} vibração detectada',
   'status.safety_active': '{count} alerta de segurança',
+  'status.gate_open.one': '{count} portão aberto',
+  'status.gate_open.other': '{count} portões abertos',
+  'status.shading_closed.one': '{count} sombreamento fechado',
+  'status.shading_closed.other': '{count} sombreamentos fechados',
+  'status.scroll_previous': 'Status anteriores',
+  'status.scroll_next': 'Mais status',
+  'sidebar.more_status': 'Mais status ativos',
 
   'action.turn_on': 'Ligar',
   'action.activate': 'Ativar',

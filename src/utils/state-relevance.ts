@@ -1,4 +1,5 @@
 import type { HassEntity, HomeAssistant } from '../types/home-assistant';
+import { isCoverStatusActive } from './cover-status';
 import { isHiddenAsUnavailable } from './entity-availability';
 
 // Home Assistant replaces `hass` on every state change of any entity. These
@@ -86,12 +87,11 @@ export function isUpdateEntityStateChange(
 
 // On Home these domains only matter through their state: status cards, area
 // badges and area counts. Attribute updates, like a light's brightness or a
-// media player's position, are not shown there.
+// media player's position, are not shown there. Covers are handled apart.
 const HOME_STATE_DOMAINS: ReadonlySet<string> = new Set([
   'light',
   'switch',
   'fan',
-  'cover',
   'lock',
   'media_player',
   'vacuum',
@@ -132,6 +132,17 @@ function isPowerSensor(state: HassEntity): boolean {
 }
 
 /**
+ * A cover's status chip depends on its state, device class and position, but
+ * only through isCoverStatusActive(): a blind that moves from 60% to 50% stays
+ * in "Shading closed", so the position ticks of a moving cover are skipped.
+ */
+export function isCoverStatusChange(oldState: HassEntity, newState: HassEntity): boolean {
+  return oldState.state !== newState.state ||
+    oldState.attributes?.device_class !== newState.attributes?.device_class ||
+    isCoverStatusActive(oldState) !== isCoverStatusActive(newState);
+}
+
+/**
  * Whether a state change can affect the Home view. `explicitEntityIds` holds
  * entities Home shows directly: favorites, the weather and alarm entities and
  * the temperature and humidity sensors of the areas.
@@ -152,6 +163,7 @@ export function isHomeRelevantStateChange(
 
   const domain = entityDomain(entityId);
   if (HOME_STATE_DOMAINS.has(domain)) return oldState.state !== newState.state;
+  if (domain === 'cover') return isCoverStatusChange(oldState, newState);
   if (HOME_ENTITY_DOMAINS.has(domain)) return true;
   if (domain === 'climate') {
     return oldState.state !== newState.state ||

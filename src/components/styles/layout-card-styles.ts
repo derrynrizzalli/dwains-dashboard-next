@@ -353,7 +353,9 @@ export const layoutCardStyles = css`
 
     /* Status Cards Section */
     .header-status-section {
+      position: relative;
       flex: 1;
+      min-width: 0;
       overflow: hidden;
     }
 
@@ -361,12 +363,69 @@ export const layoutCardStyles = css`
       display: flex;
       gap: 8px;
       overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+      /* Snapped chips stay clear of the scroll buttons. */
+      scroll-padding-inline: 36px;
       scrollbar-width: none;
       -ms-overflow-style: none;
     }
 
     .header-status-scroll::-webkit-scrollbar {
       display: none;
+    }
+
+    /* Sized by its chips, so a ResizeObserver sees chips come and go. */
+    .header-status-track {
+      display: flex;
+      flex: 0 0 auto;
+      gap: inherit;
+    }
+
+    .header-status-track > .status-card-compact {
+      scroll-snap-align: start;
+    }
+
+    .header-status-scroll-button {
+      position: absolute;
+      top: 50%;
+      z-index: 3;
+      width: 28px;
+      height: 28px;
+      margin: 0;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateY(-50%);
+      border: 1px solid color-mix(in srgb, var(--primary-text-color) 12%, transparent);
+      border-radius: 999px;
+      background: var(--card-background-color);
+      color: var(--primary-text-color);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14);
+      cursor: pointer;
+    }
+
+    .header-status-scroll-button:hover {
+      background: var(--secondary-background-color);
+    }
+
+    .header-status-scroll-button:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+
+    .header-status-scroll-button ha-icon {
+      --mdc-icon-size: 18px;
+    }
+
+    .header-status-scroll-button.previous {
+      left: 4px;
+    }
+
+    .header-status-scroll-button.next {
+      right: 4px;
     }
 
     /* Status Card Compact */
@@ -1299,9 +1358,16 @@ export const layoutCardStyles = css`
       font-weight: 500;
     }
 
+    /* Armed is a calm, locked state: lock blue, not red. */
     .welcome-alarm.alarm-armed {
-      background: var(--error-color);
-      color: var(--text-primary-color);
+      background: #2f6fd6;
+      color: #ffffff;
+    }
+
+    /* Arming, pending or unknown. */
+    .welcome-alarm.alarm-pending {
+      background: var(--secondary-background-color);
+      color: var(--primary-text-color);
     }
 
     .welcome-alarm.alarm-disarmed {
@@ -2736,9 +2802,30 @@ export const layoutCardStyles = css`
       color: var(--badge-color, #df5b63);
     }
 
-    .info-badge.alerts {
-      background: color-mix(in srgb, var(--error-color) 10%, var(--card-background-color));
-      color: var(--error-color);
+    /* Status badges of an area; --badge-color is set per badge and is red
+       for urgent ones. */
+    .info-badge.status-badge {
+      background: color-mix(in srgb, var(--badge-color, var(--primary-color)) 10%, var(--card-background-color));
+      color: var(--badge-color, var(--primary-color));
+    }
+
+    /* "+N": more badges than fit. */
+    .info-badge.status-badge.more,
+    .mobile-area-badge.more {
+      --badge-color: var(--secondary-text-color);
+      --area-badge-color: var(--secondary-text-color);
+    }
+
+    .info-badge.status-badge.more {
+      justify-content: center;
+      min-width: 24px;
+      font-weight: 700;
+    }
+
+    /* Shows its tooltip; a click selects the area like the rest of the item. */
+    .area-button .info-badge.more {
+      pointer-events: auto;
+      cursor: pointer;
     }
 
     /* Sidebar info badges (smaller) */
@@ -5190,6 +5277,17 @@ export const layoutCardStyles = css`
       opacity: 0.85;
     }
 
+    /* Urgent status: safety sensors, the alarm and, while the alarm is
+       triggered, openings and motion. --status-color is red then. */
+    .home-status-card.urgent,
+    .status-card-compact.urgent {
+      border-color: color-mix(in srgb, var(--status-color) 55%, transparent);
+    }
+
+    .home-status-card.urgent::before {
+      opacity: 1;
+    }
+
     .home-status-card .status-card-icon {
       width: 48px;
       height: 48px;
@@ -7284,6 +7382,11 @@ export const layoutCardStyles = css`
       .mobile-section-toggle,
       .home-notification-shortcut {
         position: relative;
+      }
+
+      .header-status-scroll-button {
+        width: 40px;
+        height: 40px;
       }
 
       .mobile-entity-toggle::after,
