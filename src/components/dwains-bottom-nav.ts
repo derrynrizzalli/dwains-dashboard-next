@@ -1485,11 +1485,15 @@ function _setNativeHeaderElementsHidden(
  * het hoofdmenu vanuit een losse linker knop opent.
  */
 function _setDrawerPlacement(placement: 'start' | 'end'): void {
-  _deepFindAll('wa-drawer').forEach((wa) => {
-    if (wa.getAttribute('placement') !== placement) {
-      wa.setAttribute('placement', placement);
-    }
-  });
+  // Only the sidebar drawer (home-assistant-main > ha-drawer > wa-drawer).
+  // Home Assistant's own mobile bottom sheets are wa-drawers too and keep
+  // their own placement.
+  const main = _deepFind('home-assistant-main');
+  const sidebar = main?.shadowRoot?.querySelector('ha-drawer');
+  const wa = sidebar?.shadowRoot?.querySelector('wa-drawer');
+  if (wa && wa.getAttribute('placement') !== placement) {
+    wa.setAttribute('placement', placement);
+  }
 }
 
 // ---- DD-sectie in het HA-zijmenu ------------------------------------------
@@ -1973,23 +1977,4 @@ function _shadowHosts(): Element[] {
     });
   }
   return hosts;
-}
-
-/** Zoek alle elementen met de gegeven tag, dwars door shadow-roots heen. */
-function _deepFindAll(tag: string): Element[] {
-  const found: Element[] = [];
-  const seen = new Set<Element>();
-  const queue: (Document | ShadowRoot)[] = [document];
-  while (queue.length) {
-    const root = queue.shift()!;
-    root.querySelectorAll(tag).forEach((el) => found.push(el));
-    root.querySelectorAll('*').forEach((el) => {
-      const sr = (el as Element).shadowRoot;
-      if (sr && !seen.has(el)) {
-        seen.add(el);
-        queue.push(sr);
-      }
-    });
-  }
-  return found;
 }
