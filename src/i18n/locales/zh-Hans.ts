@@ -296,6 +296,8 @@ export const zhHans = {
   'status.shading_closed.other': '{count} 遮阳已关闭',
   'domain.cover_gates': '大门',
   'domain.cover_shading': '遮阳',
+  'status.scroll_previous': '上一组状态',
+  'status.scroll_next': '更多状态',
   'action.turn_on': '打开',
   'action.activate': '激活',
   'action.open_camera': '打开摄影机',

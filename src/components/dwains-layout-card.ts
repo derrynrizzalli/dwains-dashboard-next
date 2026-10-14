@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { ref } from 'lit/directives/ref.js';
 import { styleMap } from 'lit/directives/style-map.js';
 import memoizeOne from 'memoize-one';
 
@@ -195,6 +196,8 @@ export class DwainsLayoutCard extends LitElement {
   @state() private _isMobile = false;
   @state() private _headerExpanded = false;
   @state() private _headerCompact = false;
+  @state() private _headerStatusCanScrollLeft = false;
+  @state() private _headerStatusCanScrollRight = false;
   private _favoritesRenderVersion = 0;
   @state() private _currentTime = '';
   @state() private _currentDate = '';
@@ -246,6 +249,11 @@ export class DwainsLayoutCard extends LitElement {
   private _hostedCards?: Element[];
   private _clockTimer?: number;
   private _resizeObserver?: ResizeObserver;
+  // The header status row: its size and the size of its chips are observed,
+  // so overflow is only measured when one of them changes or on scroll.
+  private _headerStatusScrollEl?: HTMLElement;
+  private _headerStatusResizeObserver?: ResizeObserver;
+  private _headerStatusScrollRaf?: number;
   private _persistentNotificationsSubscription = new ManagedSubscription();
   private _persistentNotificationsLoaded = false;
   private _homeSummariesLoaded = false;
@@ -561,6 +569,10 @@ export class DwainsLayoutCard extends LitElement {
     if (this._areaSidebarRestoreRaf !== undefined) {
       cancelAnimationFrame(this._areaSidebarRestoreRaf);
       this._areaSidebarRestoreRaf = undefined;
+    }
+    if (this._headerStatusScrollRaf !== undefined) {
+      cancelAnimationFrame(this._headerStatusScrollRaf);
+      this._headerStatusScrollRaf = undefined;
     }
     if (this._optimisticCleanupTimer !== undefined) {
       window.clearTimeout(this._optimisticCleanupTimer);
@@ -1120,6 +1132,7 @@ export class DwainsLayoutCard extends LitElement {
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
     }
+    this._headerStatusResizeObserver?.disconnect();
   }
 
   protected override shouldUpdate(changedProps: PropertyValues): boolean {
@@ -1964,36 +1977,127 @@ export class DwainsLayoutCard extends LitElement {
 
     return html`
       <div class="header-status-section">
-        <div class="header-status-scroll">
-          ${repeat(
-            domains,
-            d => `${d.domain}-${d.statusKind || d.deviceClass || d.name}`,
-            domain => html`
-              <div
-                class="status-card-compact ${domain.domain} ${domain.value ? 'has-value' : ''} header-card"
-                style=${this._domainStatusStyle(domain.domain, domain.deviceClass)}
-                role="button"
-                tabindex="0"
-                @click=${() => this._handleStatusCardClick(domain)}
-                @keydown=${(event: KeyboardEvent) => this._handleActivationKeydown(event, () => this._handleStatusCardClick(domain))}
-                data-domain=${domain.domain}
-                title=${this._statusCardTitle(domain)}
-                aria-label=${this._statusCardAccessibleLabel(domain)}
-              >
-                <div class="status-card-icon-compact">
-                  <ha-icon icon=${domain.icon}></ha-icon>
-                  ${domain.count > 0 ? html`
-                    <div class="status-card-badge-compact">${domain.count}</div>
-                  ` : nothing}
+        ${this._headerStatusCanScrollLeft ? html`
+          <button
+            class="header-status-scroll-button previous"
+            type="button"
+            title=${this._t('status.scroll_previous')}
+            aria-label=${this._t('status.scroll_previous')}
+            @click=${() => this._scrollHeaderStatus(-1)}
+          >
+            <ha-icon icon="mdi:chevron-left"></ha-icon>
+          </button>
+        ` : nothing}
+        <div
+          class="header-status-scroll"
+          ${ref(this._headerStatusScrollRef)}
+          @scroll=${this._headerStatusScrollListener}
+          @wheel=${this._handleHeaderStatusWheel}
+        >
+          <div class="header-status-track">
+            ${repeat(
+              domains,
+              d => `${d.domain}-${d.statusKind || d.deviceClass || d.name}`,
+              domain => html`
+                <div
+                  class="status-card-compact ${domain.domain} ${domain.value ? 'has-value' : ''} header-card"
+                  style=${this._domainStatusStyle(domain.domain, domain.deviceClass)}
+                  role="button"
+                  tabindex="0"
+                  @click=${() => this._handleStatusCardClick(domain)}
+                  @keydown=${(event: KeyboardEvent) => this._handleActivationKeydown(event, () => this._handleStatusCardClick(domain))}
+                  data-domain=${domain.domain}
+                  title=${this._statusCardTitle(domain)}
+                  aria-label=${this._statusCardAccessibleLabel(domain)}
+                >
+                  <div class="status-card-icon-compact">
+                    <ha-icon icon=${domain.icon}></ha-icon>
+                    ${domain.count > 0 ? html`
+                      <div class="status-card-badge-compact">${domain.count}</div>
+                    ` : nothing}
+                  </div>
+                  <div class="status-card-title-compact">${domain.value || this._statusCardTitle(domain)}</div>
+                  ${domain.value ? html`<div class="status-card-subtitle-compact">${domain.name}</div>` : nothing}
                 </div>
-                <div class="status-card-title-compact">${domain.value || this._statusCardTitle(domain)}</div>
-                ${domain.value ? html`<div class="status-card-subtitle-compact">${domain.name}</div>` : nothing}
-              </div>
-            `
-          )}
+              `
+            )}
+          </div>
         </div>
+        ${this._headerStatusCanScrollRight ? html`
+          <button
+            class="header-status-scroll-button next"
+            type="button"
+            title=${this._t('status.scroll_next')}
+            aria-label=${this._t('status.scroll_next')}
+            @click=${() => this._scrollHeaderStatus(1)}
+          >
+            <ha-icon icon="mdi:chevron-right"></ha-icon>
+          </button>
+        ` : nothing}
       </div>
     `;
+  }
+
+  /**
+   * Called by Lit when the status row is rendered or removed. The row itself
+   * (width changes) and its track (chips added or removed) are observed.
+   */
+  private _headerStatusScrollRef = (element?: Element): void => {
+    if (element === this._headerStatusScrollEl) return;
+    this._headerStatusResizeObserver?.disconnect();
+    this._headerStatusScrollEl = element instanceof HTMLElement ? element : undefined;
+    if (this._headerStatusScrollEl) {
+      this._headerStatusResizeObserver ??= new ResizeObserver(() => this._scheduleHeaderStatusScrollState());
+      this._headerStatusResizeObserver.observe(this._headerStatusScrollEl);
+      const track = this._headerStatusScrollEl.firstElementChild;
+      if (track) this._headerStatusResizeObserver.observe(track);
+    }
+    // Lit calls refs while it renders; update the buttons afterwards.
+    this._scheduleHeaderStatusScrollState();
+  };
+
+  private _headerStatusScrollListener = {
+    handleEvent: () => this._scheduleHeaderStatusScrollState(),
+    passive: true,
+  };
+
+  private _scheduleHeaderStatusScrollState(): void {
+    if (this._headerStatusScrollRaf !== undefined) return;
+    this._headerStatusScrollRaf = requestAnimationFrame(() => {
+      this._headerStatusScrollRaf = undefined;
+      this._updateHeaderStatusScrollState();
+    });
+  }
+
+  private _updateHeaderStatusScrollState(): void {
+    const scroller = this._headerStatusScrollEl;
+    let canScrollLeft = false;
+    let canScrollRight = false;
+    if (scroller?.isConnected) {
+      const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
+      canScrollLeft = scroller.scrollLeft > 1;
+      canScrollRight = scroller.scrollLeft < maxScrollLeft - 1;
+    }
+    if (this._headerStatusCanScrollLeft !== canScrollLeft) this._headerStatusCanScrollLeft = canScrollLeft;
+    if (this._headerStatusCanScrollRight !== canScrollRight) this._headerStatusCanScrollRight = canScrollRight;
+  }
+
+  // A vertical mouse wheel scrolls the row sideways. Trackpads that already
+  // scroll horizontally keep their own axis, and at the end of the row the
+  // wheel is left alone.
+  private _handleHeaderStatusWheel = (event: WheelEvent): void => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    const canScroll = event.deltaY > 0 ? this._headerStatusCanScrollRight : this._headerStatusCanScrollLeft;
+    const scroller = event.currentTarget as HTMLElement | null;
+    if (!canScroll || !scroller) return;
+    event.preventDefault();
+    scroller.scrollLeft += event.deltaY;
+  };
+
+  private _scrollHeaderStatus(direction: -1 | 1): void {
+    const scroller = this._headerStatusScrollEl;
+    if (!scroller) return;
+    scroller.scrollBy({ left: direction * Math.max(120, scroller.clientWidth * 0.7), behavior: 'smooth' });
   }
 
   private _renderHeaderExpandButton() {

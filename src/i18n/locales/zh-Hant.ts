@@ -296,6 +296,8 @@ export const zhHant = {
   'status.shading_closed.other': '{count} 遮陽已關閉',
   'domain.cover_gates': '大門',
   'domain.cover_shading': '遮陽',
+  'status.scroll_previous': '上一組狀態',
+  'status.scroll_next': '更多狀態',
   'action.turn_on': '開啟',
   'action.activate': '啟用',
   'action.open_camera': '開啟攝影機',

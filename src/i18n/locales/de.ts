@@ -296,6 +296,8 @@ export const de = {
   'status.shading_closed.other': '{count} Beschattungen geschlossen',
   'domain.cover_gates': 'Tore',
   'domain.cover_shading': 'Beschattung',
+  'status.scroll_previous': 'Vorherige Status',
+  'status.scroll_next': 'Weitere Status',
   'action.turn_on': 'Einschalten',
   'action.activate': 'Aktivieren',
   'action.open_camera': 'Kamera öffnen',

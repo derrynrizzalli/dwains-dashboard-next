@@ -301,6 +301,8 @@ export const en = {
   'status.shading_closed.other': '{count} shading closed',
   'domain.cover_gates': 'Gates',
   'domain.cover_shading': 'Shading',
+  'status.scroll_previous': 'Previous status',
+  'status.scroll_next': 'More status',
 
   'action.turn_on': 'Turn on',
   'action.activate': 'Activate',

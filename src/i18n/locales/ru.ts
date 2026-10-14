@@ -303,6 +303,8 @@ export const ru = {
   'status.shading_closed.other': '{count} затенение закрыто',
   'domain.cover_gates': 'Ворота',
   'domain.cover_shading': 'Затенение',
+  'status.scroll_previous': 'Предыдущие статусы',
+  'status.scroll_next': 'Ещё статусы',
 
   'action.turn_on': 'Включить',
   'action.activate': 'Активировать',

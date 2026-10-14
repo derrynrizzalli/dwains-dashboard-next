@@ -296,6 +296,8 @@ export const nl = {
   'status.shading_closed.other': '{count} zonwering dicht',
   'domain.cover_gates': 'Poorten',
   'domain.cover_shading': 'Zonwering',
+  'status.scroll_previous': 'Vorige status',
+  'status.scroll_next': 'Meer status',
   'action.turn_on': 'Schakel in',
   'action.activate': 'Activeren',
   'action.open_camera': 'Camera openen',

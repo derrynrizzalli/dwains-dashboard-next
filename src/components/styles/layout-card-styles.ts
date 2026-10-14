@@ -352,7 +352,9 @@ export const layoutCardStyles = css`
 
     /* Status Cards Section */
     .header-status-section {
+      position: relative;
       flex: 1;
+      min-width: 0;
       overflow: hidden;
     }
 
@@ -360,12 +362,69 @@ export const layoutCardStyles = css`
       display: flex;
       gap: 8px;
       overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+      /* Snapped chips stay clear of the scroll buttons. */
+      scroll-padding-inline: 36px;
       scrollbar-width: none;
       -ms-overflow-style: none;
     }
 
     .header-status-scroll::-webkit-scrollbar {
       display: none;
+    }
+
+    /* Sized by its chips, so a ResizeObserver sees chips come and go. */
+    .header-status-track {
+      display: flex;
+      flex: 0 0 auto;
+      gap: inherit;
+    }
+
+    .header-status-track > .status-card-compact {
+      scroll-snap-align: start;
+    }
+
+    .header-status-scroll-button {
+      position: absolute;
+      top: 50%;
+      z-index: 3;
+      width: 28px;
+      height: 28px;
+      margin: 0;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateY(-50%);
+      border: 1px solid color-mix(in srgb, var(--primary-text-color) 12%, transparent);
+      border-radius: 999px;
+      background: var(--card-background-color);
+      color: var(--primary-text-color);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14);
+      cursor: pointer;
+    }
+
+    .header-status-scroll-button:hover {
+      background: var(--secondary-background-color);
+    }
+
+    .header-status-scroll-button:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+
+    .header-status-scroll-button ha-icon {
+      --mdc-icon-size: 18px;
+    }
+
+    .header-status-scroll-button.previous {
+      left: 4px;
+    }
+
+    .header-status-scroll-button.next {
+      right: 4px;
     }
 
     /* Status Card Compact */
@@ -7212,6 +7271,11 @@ export const layoutCardStyles = css`
       .mobile-section-toggle,
       .home-notification-shortcut {
         position: relative;
+      }
+
+      .header-status-scroll-button {
+        width: 40px;
+        height: 40px;
       }
 
       .mobile-entity-toggle::after,

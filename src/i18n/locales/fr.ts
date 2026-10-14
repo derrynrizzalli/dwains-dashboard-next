@@ -296,6 +296,8 @@ export const fr = {
   'status.shading_closed.other': '{count} occultations fermées',
   'domain.cover_gates': 'Portails',
   'domain.cover_shading': 'Occultation',
+  'status.scroll_previous': 'Statuts précédents',
+  'status.scroll_next': 'Plus de statuts',
   'action.turn_on': 'Allumer',
   'action.activate': 'Activer',
   'action.open_camera': 'Ouvrir la caméra',

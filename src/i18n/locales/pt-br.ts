@@ -303,6 +303,8 @@ export const ptBR = {
   'status.shading_closed.other': '{count} sombreamentos fechados',
   'domain.cover_gates': 'Portões',
   'domain.cover_shading': 'Sombreamento',
+  'status.scroll_previous': 'Status anteriores',
+  'status.scroll_next': 'Mais status',
 
   'action.turn_on': 'Ligar',
   'action.activate': 'Ativar',

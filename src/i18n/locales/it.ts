@@ -303,6 +303,8 @@ export const it = {
   'status.shading_closed.other': '{count} schermature chiuse',
   'domain.cover_gates': 'Cancelli',
   'domain.cover_shading': 'Schermature',
+  'status.scroll_previous': 'Stati precedenti',
+  'status.scroll_next': 'Altri stati',
 
   'action.turn_on': 'Accendi',
   'action.activate': 'Attiva',

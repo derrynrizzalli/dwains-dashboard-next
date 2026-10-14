@@ -296,6 +296,8 @@ export const es = {
   'status.shading_closed.other': '{count} protecciones solares cerradas',
   'domain.cover_gates': 'Portones',
   'domain.cover_shading': 'Protección solar',
+  'status.scroll_previous': 'Estados anteriores',
+  'status.scroll_next': 'Más estados',
   'action.turn_on': 'Encender',
   'action.activate': 'Activar',
   'action.open_camera': 'Abrir cámara',
