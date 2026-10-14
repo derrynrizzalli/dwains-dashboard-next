@@ -18,9 +18,9 @@ See this as Dwains Dashboard v4: totally rebuilt from scratch, with a completely
 
 ## Preview
 
-[![Watch the 22-second DD Next launch video](docs/media/dd-next-1.11-launch.jpg)](https://dwainscheeren.github.io/dwains-dashboard-next/media/dd-next-1.11-launch.mp4)
+[![Watch the 22-second DD Next launch video](docs/media/dd-next-1.11-home-areas.jpg)](https://dwainscheeren.github.io/dwains-dashboard-next/media/dd-next-1.11-home-areas.mp4)
 
-[Watch the launch video](https://dwainscheeren.github.io/dwains-dashboard-next/media/dd-next-1.11-launch.mp4) · 22 seconds · 1080p · Music
+[Watch the launch video](https://dwainscheeren.github.io/dwains-dashboard-next/media/dd-next-1.11-home-areas.mp4) · 22 seconds · 1080p · Music
 
 Current screenshots from **v1.11.0**, captured in October 2026. The interface is in English; room and entity names come from the Home Assistant setup.
 
@@ -29,12 +29,12 @@ Current screenshots from **v1.11.0**, captured in October 2026. The interface is
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/v1.11.0/desktop/devices-dark.jpg" alt="Dwains Dashboard Next 1.11.0 Devices overview in dark mode" width="920">
+  <img src="docs/screenshots/v1.11.0/desktop/room-kitchen.jpg" alt="Dwains Dashboard Next 1.11.0 individual room controls" width="920">
 </p>
 
 <p align="center">
   <img src="docs/screenshots/v1.11.0/mobile/home.jpg" alt="Dwains Dashboard Next 1.11.0 mobile Home" width="260">
-  <img src="docs/screenshots/v1.11.0/mobile/devices.jpg" alt="Dwains Dashboard Next 1.11.0 mobile Devices" width="260">
+  <img src="docs/screenshots/v1.11.0/mobile/room-kitchen.jpg" alt="Dwains Dashboard Next 1.11.0 mobile room controls" width="260">
 </p>
 
 See the [screenshot gallery](docs/screenshots.md) for room controls, wall tablet settings and more views. Camera previews are hidden in the current captures.
