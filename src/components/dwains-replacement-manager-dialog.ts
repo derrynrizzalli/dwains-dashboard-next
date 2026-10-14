@@ -3,20 +3,22 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { mdiClose } from '@mdi/js';
 import type { HomeAssistant } from '../types/home-assistant';
-import type {
-  BlueprintReplacementAssignment,
-  BlueprintReplacementGroup,
-  BlueprintReplacementSurface,
-  BlueprintReplacements,
-  DwainsDashboardConfig,
-} from '../types/strategy';
-import { defaultValues, parseBlueprintYaml, type ParsedBlueprint } from '../utils/blueprints';
+import type { BlueprintReplacementAssignment, DwainsDashboardConfig } from '../types/strategy';
+import {
+  blueprintText,
+  defaultValues,
+  parseBlueprintYaml,
+  type ParsedBlueprint,
+} from '../utils/blueprints';
+import { domainReplacementEntries, setDomainReplacement } from '../utils/blueprint-replacements';
 import { getDomainName } from '../utils/domain-names';
-import { ddLocalize } from '../utils/localize';
+import { ddLang, ddLocalize } from '../utils/localize';
 
 interface ReplacementManagerParams {
   config: DwainsDashboardConfig;
   onSave: (config: DwainsDashboardConfig) => void;
+  /** Domain of an existing replacement to edit. */
+  initialDomain?: string;
 }
 
 interface GalleryItem {
@@ -30,8 +32,6 @@ interface GalleryItem {
 
 const GALLERY_URL =
   'https://raw.githubusercontent.com/dwainscheeren/dwains-dashboard-blueprints/main/blueprints.json';
-
-const REPLACEMENT_SURFACES: BlueprintReplacementSurface[] = ['area_cards', 'devices_cards'];
 
 const DOMAIN_HINTS: Array<[string, string[]]> = [
   ['alarm_control_panel', ['alarm-control-panel', 'alarm card', 'alarm_control_panel', 'alarm']],
@@ -58,6 +58,11 @@ const SYNTHETIC_INPUTS = new Set([
   'replace_with_input_area',
 ]);
 
+/**
+ * Assigns a replace-card blueprint to a domain, or edits the blueprint of an
+ * existing domain replacement. The list of replacements lives on the settings
+ * page.
+ */
 @customElement('dwains-dashboard-next-replacement-manager-dialog')
 export class DwainsReplacementManagerDialog extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
@@ -65,9 +70,9 @@ export class DwainsReplacementManagerDialog extends LitElement {
   @state() private _open = false;
   @state() private _params?: ReplacementManagerParams;
   @state() private _config?: DwainsDashboardConfig;
-  @state() private _replacements: BlueprintReplacements = {};
 
-  @state() private _domain = 'light';
+  // Domain filter and target. Empty means all domains.
+  @state() private _domain = '';
 
   @state() private _gallery: GalleryItem[] = [];
   @state() private _galleryLoading = false;
@@ -83,15 +88,20 @@ export class DwainsReplacementManagerDialog extends LitElement {
     return ddLocalize(this.hass, key, replacements);
   }
 
+  private get _editDomain(): string | undefined {
+    return this._params?.initialDomain || undefined;
+  }
+
   public showDialog(params: ReplacementManagerParams): void {
     this._params = params;
     this._config = params.config;
-    this._replacements = cloneReplacements(params.config.blueprint_replacements || {});
-    this._domain = this._domainOptions()[0]?.value || 'light';
+    this._domain = params.initialDomain || '';
+    this._search = '';
     this._selected = undefined;
     this._parsed = undefined;
     this._inputs = {};
     this._error = '';
+    if (params.initialDomain) this._selectCurrentAssignment(params.initialDomain);
     this._open = true;
     void this._loadGallery();
   }
@@ -104,8 +114,11 @@ export class DwainsReplacementManagerDialog extends LitElement {
 
   protected render() {
     if (!this._open || !this._config) return nothing;
+    const title = this._editDomain
+      ? this._t('replacement.edit_title', { domain: getDomainName(this.hass, this._editDomain) })
+      : this._t('replacement.assign');
     return html`
-      <ha-dialog open @closed=${this.closeDialog} .heading=${this._t('settings.blueprint_replacements')} hideActions>
+      <ha-dialog open @closed=${this.closeDialog} .heading=${title} hideActions>
         <ha-dialog-header slot="header">
           <ha-icon-button
             slot="navigationIcon"
@@ -113,119 +126,39 @@ export class DwainsReplacementManagerDialog extends LitElement {
             .label=${this._t('common.close')}
             @click=${this.closeDialog}
           ></ha-icon-button>
-          <span slot="title">${this._t('settings.blueprint_replacements')}</span>
+          <span slot="title">${title}</span>
         </ha-dialog-header>
 
         <div class="content">
-          <section class="overview">
-            ${this._renderSummary()}
-          </section>
-
-          ${this._renderAssignments()}
           ${this._renderBuilder()}
         </div>
       </ha-dialog>
     `;
   }
 
-  private _renderSummary() {
-    const count = this._assignmentEntries().length;
-    return html`
-      <div class="surface-summary">
-        <div>
-          <div class="surface-title">${this._t('replacement.views_title')}</div>
-          <div class="surface-desc">
-            ${this._t('replacement.views_description')}
-          </div>
-        </div>
-        <span class="count">${count}</span>
-      </div>
-    `;
-  }
-
-  private _renderAssignments() {
-    const entries = this._assignmentEntries();
-    return html`
-      <section class="assignment-section">
-        <div class="section-header">
-          <ha-icon icon="mdi:shape-outline"></ha-icon>
-          <h3>${this._t('replacement.domain_replacements')}</h3>
-        </div>
-        ${entries.length
-          ? html`
-              <div class="assignment-list">
-                ${repeat(
-                  entries,
-                  (entry) => entry.target,
-                  (entry) => this._renderAssignment(entry.target, entry.assignment)
-                )}
-              </div>
-            `
-          : html`<div class="empty">${this._t('replacement.empty')}</div>`}
-      </section>
-    `;
-  }
-
-  private _renderAssignment(
-    target: string,
-    assignment: BlueprintReplacementAssignment
-  ) {
-    return html`
-      <div class="assignment ${assignment.enabled === false ? 'disabled' : ''}">
-        <div class="assignment-main">
-          <div class="target-pill">${this._t('replacement.target', { domain: getDomainName(this.hass, target) })}</div>
-          <div class="assignment-name">${assignment.name}</div>
-          <div class="assignment-meta">
-            ${assignment.version ? html`<span>v${assignment.version}</span>` : nothing}
-            ${(assignment.custom_cards || []).map((card) => html`<span>${card}</span>`)}
-          </div>
-        </div>
-        <div class="assignment-actions">
-          <button
-            class="icon-button"
-            title=${assignment.enabled === false ? this._t('common.enable') : this._t('common.disable')}
-            @click=${() => this._toggleAssignment(target)}
-          >
-            <ha-icon icon=${assignment.enabled === false ? 'mdi:eye-off' : 'mdi:eye'}></ha-icon>
-          </button>
-          <button
-            class="icon-button danger"
-            title=${this._t('common.remove')}
-            @click=${() => this._removeAssignment(target)}
-          >
-            <ha-icon icon="mdi:delete-outline"></ha-icon>
-          </button>
-        </div>
-      </div>
-    `;
-  }
-
   private _renderBuilder() {
+    const conflict = this._conflict();
     return html`
       <section class="builder">
-        <div class="section-header">
-          <ha-icon icon="mdi:puzzle-edit-outline"></ha-icon>
-          <h3>${this._t('replacement.assign')}</h3>
-        </div>
-        ${this._error ? html`<div class="error">${this._error}</div>` : nothing}
-        <div class="builder-grid">
-          <div class="control-block domain-control">
-            <label>${this._t('replacement.domain')}</label>
+        <p class="hint intro">${this._t('replacement.views_description')}</p>
+        <div class="builder-controls">
+          <label class="control-block">
+            <span>${this._t('replacement.domain')}</span>
             ${this._renderDomainControl()}
-            <div class="hint">${this._t('replacement.applies_hint')}</div>
-          </div>
+          </label>
+          <label class="control-block">
+            <span>${this._t('replacement.search')}</span>
+            <input
+              class="search"
+              type="search"
+              .value=${this._search}
+              @input=${(e: Event) => (this._search = (e.target as HTMLInputElement).value)}
+            />
+          </label>
         </div>
-
-        <div class="gallery-toolbar">
-          <input
-            class="search"
-            type="search"
-            placeholder=${this._t('replacement.search')}
-            .value=${this._search}
-            @input=${(e: Event) => (this._search = (e.target as HTMLInputElement).value)}
-          />
-          ${this._galleryLoading ? html`<span class="loading">${this._t('common.loading')}</span>` : nothing}
-        </div>
+        ${this._error ? html`<div class="error" role="alert">${this._error}</div>` : nothing}
+        ${conflict ? html`<div class="error" role="alert">${conflict}</div>` : nothing}
+        ${this._galleryLoading ? html`<div class="loading">${this._t('common.loading')}</div>` : nothing}
         ${this._galleryError ? html`<div class="error">${this._galleryError}</div>` : nothing}
 
         <div class="gallery">
@@ -234,7 +167,9 @@ export class DwainsReplacementManagerDialog extends LitElement {
             (item) => item.url,
             (item) => html`
               <button
+                type="button"
                 class="blueprint-choice ${this._selected?.url === item.url ? 'selected' : ''}"
+                aria-pressed=${this._selected?.url === item.url ? 'true' : 'false'}
                 @click=${() => this._selectBlueprint(item)}
               >
                 <span class="choice-name">${item.name}</span>
@@ -254,15 +189,15 @@ export class DwainsReplacementManagerDialog extends LitElement {
   }
 
   private _renderDomainControl() {
-    const options = this._domainOptions();
     return html`
       <select
         .value=${this._domain}
-        @change=${(e: Event) => {
-          this._domain = (e.target as HTMLSelectElement).value;
-        }}
+        ?disabled=${!!this._editDomain}
+        @change=${(e: Event) => this._setDomain((e.target as HTMLSelectElement).value)}
       >
-        ${options.map((option) => html`<option value=${option.value}>${option.label}</option>`)}
+        ${this._domainOptions().map(
+          (option) => html`<option value=${option.value} ?selected=${option.value === this._domain}>${option.label}</option>`
+        )}
       </select>
     `;
   }
@@ -287,7 +222,11 @@ export class DwainsReplacementManagerDialog extends LitElement {
         </div>
 
         ${this._loadingBlueprint ? html`<div class="loading">${this._t('replacement.loading_blueprint')}</div>` : nothing}
-        <div class="hint">${this._t('replacement.applies_to', { domain: getDomainName(this.hass, this._domain) })}</div>
+        <div class="hint">
+          ${this._domain
+            ? this._t('replacement.applies_to', { domain: getDomainName(this.hass, this._domain) })
+            : this._t('replacement.choose_domain')}
+        </div>
         ${inputKeys.length
           ? html`
               <div class="input-grid">
@@ -301,10 +240,12 @@ export class DwainsReplacementManagerDialog extends LitElement {
 
   private _renderInputField(key: string) {
     const input = this._parsed?.meta.input?.[key];
+    const lang = ddLang(this.hass);
+    const description = input ? blueprintText(input, 'description', lang) : undefined;
     return html`
       <label class="input-field">
-        <span>${input?.name || key}</span>
-        ${input?.description ? html`<small>${input.description}</small>` : nothing}
+        <span>${(input && blueprintText(input, 'name', lang)) || key}</span>
+        ${description ? html`<small>${description}</small>` : nothing}
         <input
           type=${input?.type === 'number' ? 'number' : 'text'}
           .value=${this._inputs[key] ?? ''}
@@ -341,6 +282,37 @@ export class DwainsReplacementManagerDialog extends LitElement {
     }
   }
 
+  // Start editing with the blueprint and inputs of the current replacement.
+  private _selectCurrentAssignment(domain: string): void {
+    const current = this._assignment(domain);
+    if (!current) return;
+    try {
+      const parsed = parseBlueprintYaml(current.blueprint);
+      this._selected = {
+        name: current.name,
+        url: current.source || '',
+        version: current.version,
+        custom_cards: current.custom_cards,
+      };
+      this._parsed = parsed;
+      this._inputs = { ...defaultValues(parsed.meta), ...(current.inputs || {}) };
+    } catch (e: any) {
+      this._error = this._t('replacement.load_failed', { name: current.name, error: String(e?.message || e) });
+    }
+  }
+
+  private _setDomain(domain: string): void {
+    this._domain = domain;
+    this._error = '';
+    // A blueprint made for another domain no longer fits.
+    const selectedDomain = this._selected ? inferBlueprintDomain(this._selected, this._parsed) : '';
+    if (domain && selectedDomain && selectedDomain !== domain) {
+      this._selected = undefined;
+      this._parsed = undefined;
+      this._inputs = {};
+    }
+  }
+
   private async _selectBlueprint(item: GalleryItem): Promise<void> {
     this._selected = item;
     this._parsed = undefined;
@@ -351,20 +323,33 @@ export class DwainsReplacementManagerDialog extends LitElement {
       const resp = await fetch(item.url, { redirect: 'follow' });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const text = await resp.text();
+      if (this._selected !== item) return;
       const parsed = parseBlueprintYaml(text);
-      this._parsed = parsed;
-      this._inputs = defaultValues(parsed.meta);
-      const inferredDomain = inferBlueprintDomain(item, parsed);
-      if (inferredDomain && this._domainOptions().some((option) => option.value === inferredDomain)) {
-        this._domain = inferredDomain;
+      const blueprintDomain = inferBlueprintDomain(item, parsed);
+      if (blueprintDomain && this._domain && blueprintDomain !== this._domain) {
+        this._error = this._t('replacement.domain_mismatch', {
+          name: item.name,
+          other: getDomainName(this.hass, blueprintDomain),
+          domain: getDomainName(this.hass, this._domain),
+        });
+        this._selected = undefined;
+        return;
       }
+      if (blueprintDomain && !this._domain) this._domain = blueprintDomain;
+      // Keep the inputs when picking the blueprint that is being edited again.
+      const current = this._editDomain ? this._assignment(this._editDomain) : undefined;
+      this._parsed = parsed;
+      this._inputs = {
+        ...defaultValues(parsed.meta),
+        ...(current?.source && current.source === item.url ? current.inputs : {}),
+      };
     } catch (e: any) {
       this._error = this._t('replacement.load_failed', {
         name: item.name,
         error: String(e?.message || e),
       });
     } finally {
-      this._loadingBlueprint = false;
+      if (this._selected === item || !this._selected) this._loadingBlueprint = false;
     }
   }
 
@@ -374,109 +359,63 @@ export class DwainsReplacementManagerDialog extends LitElement {
     const assignment: BlueprintReplacementAssignment = {
       id: this._slug(`${this._selected.name}-${target}`),
       name: this._selected.name,
-      source: this._selected.url,
+      source: this._selected.url || undefined,
       version: this._parsed.meta.version,
       blueprint: this._parsed.raw,
       inputs: this._stripSyntheticInputs(this._inputs),
       custom_cards: this._parsed.meta.custom_cards || this._selected.custom_cards || [],
-      enabled: true,
+      enabled: this._assignment(target)?.enabled ?? true,
     };
-
-    let replacements = cloneReplacements(this._replacements);
-    for (const surface of REPLACEMENT_SURFACES) {
-      replacements = this._setDomainAssignment(replacements, surface, target, assignment);
-    }
-    this._commit(replacements);
+    const replacements = setDomainReplacement(this._config!.blueprint_replacements, target, assignment);
+    this._params?.onSave({ ...this._config!, blueprint_replacements: replacements });
+    this.closeDialog();
   };
 
-  private _toggleAssignment(target: string): void {
-    const current = this._domainAssignment(target);
-    if (!current) return;
-    const next = { ...current, enabled: current.enabled === false };
-    let replacements = cloneReplacements(this._replacements);
-    for (const surface of REPLACEMENT_SURFACES) {
-      replacements = this._setDomainAssignment(replacements, surface, target, next);
-    }
-    this._commit(replacements);
+  private _assignment(domain: string): BlueprintReplacementAssignment | undefined {
+    return domainReplacementEntries(this._config?.blueprint_replacements).find((entry) => entry.domain === domain)
+      ?.assignment;
   }
 
-  private _removeAssignment(target: string): void {
-    const replacements = cloneReplacements(this._replacements);
-    for (const surface of REPLACEMENT_SURFACES) {
-      const bucket = replacements[surface]?.by_domain;
-      if (bucket) delete bucket[target];
-    }
-    this._commit(replacements);
+  // Another replacement already uses the chosen domain.
+  private _conflict(): string {
+    if (!this._domain || this._domain === this._editDomain || !this._assignment(this._domain)) return '';
+    return this._t('replacement.already_assigned', { domain: getDomainName(this.hass, this._domain) });
   }
 
-  private _commit(replacements: BlueprintReplacements): void {
-    this._replacements = replacements;
-    const nextConfig = { ...this._config!, blueprint_replacements: replacements };
-    this._config = nextConfig;
-    this._params?.onSave(nextConfig);
-  }
-
-  private _setDomainAssignment(
-    replacements: BlueprintReplacements,
-    surface: BlueprintReplacementSurface,
-    target: string,
-    assignment: BlueprintReplacementAssignment
-  ): BlueprintReplacements {
-    const surfaceGroup = replacements[surface] || {};
-    replacements[surface] = {
-      ...surfaceGroup,
-      by_domain: {
-        ...(surfaceGroup.by_domain || {}),
-        [target]: assignment,
-      },
-    };
-    return replacements;
-  }
-
-  private _assignmentEntries(): Array<{ target: string; assignment: BlueprintReplacementAssignment }> {
-    const targets = new Set<string>();
-    REPLACEMENT_SURFACES.forEach((surface) => {
-      Object.keys(this._replacements[surface]?.by_domain || {}).forEach((target) => targets.add(target));
-    });
-    return Array.from(targets)
-      .sort((a, b) => getDomainName(this.hass, a).localeCompare(getDomainName(this.hass, b)))
-      .map((target) => ({ target, assignment: this._domainAssignment(target)! }))
-      .filter((entry) => !!entry.assignment);
-  }
-
-  private _domainAssignment(target: string): BlueprintReplacementAssignment | undefined {
-    return (
-      this._replacements.area_cards?.by_domain?.[target] ||
-      this._replacements.devices_cards?.by_domain?.[target]
-    );
-  }
-
+  // Domains offered by the gallery, plus the assigned and current ones.
   private _domainOptions(): Array<{ value: string; label: string }> {
     const domains = new Set<string>();
-    Object.keys(this.hass?.states || {}).forEach((entityId) => domains.add(entityId.split('.')[0] || ''));
-    ['light', 'switch', 'climate', 'cover', 'fan', 'media_player', 'person', 'sensor', 'binary_sensor'].forEach(
-      (domain) => domains.add(domain)
-    );
-    return Array.from(domains)
-      .filter(Boolean)
-      .sort()
-      .map((domain) => ({ value: domain, label: getDomainName(this.hass, domain) }));
+    this._gallery.forEach((item) => {
+      const domain = inferBlueprintDomain(item);
+      if (domain) domains.add(domain);
+    });
+    domainReplacementEntries(this._config?.blueprint_replacements).forEach((entry) => domains.add(entry.domain));
+    if (this._domain) domains.add(this._domain);
+    const options = Array.from(domains)
+      .map((domain) => ({ value: domain, label: getDomainName(this.hass, domain) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return [{ value: '', label: this._t('replacement.all_domains') }, ...options];
   }
 
   private _canApply(): boolean {
-    return !!this._parsed && !!this._selected && !!this._domain;
+    return !!this._parsed && !!this._selected && !!this._domain && !this._conflict();
   }
 
+  // Blueprints for the chosen domain, plus blueprints that fit any domain.
   private _filteredGallery(): GalleryItem[] {
     const q = this._search.trim().toLowerCase();
-    const target = this._domain.toLowerCase();
     return this._gallery
+      .filter((item) => {
+        if (!this._domain) return true;
+        const domain = inferBlueprintDomain(item);
+        return !domain || domain === this._domain;
+      })
       .filter((item) => {
         if (!q) return true;
         const haystack = `${item.name} ${item.description || ''} ${(item.custom_cards || []).join(' ')}`.toLowerCase();
         return haystack.includes(q);
       })
-      .sort((a, b) => scoreGallery(b, target) - scoreGallery(a, target) || a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   private _editableInputKeys(): string[] {
@@ -501,8 +440,8 @@ export class DwainsReplacementManagerDialog extends LitElement {
 
   static override styles = css`
     :host {
-      --mdc-dialog-min-width: min(960px, 92vw);
-      --mdc-dialog-max-width: min(1040px, 96vw);
+      --mdc-dialog-min-width: min(880px, 92vw);
+      --mdc-dialog-max-width: min(960px, 96vw);
     }
     ha-dialog {
       --dialog-content-padding: 0;
@@ -511,40 +450,25 @@ export class DwainsReplacementManagerDialog extends LitElement {
       padding: 0 18px 20px;
       color: var(--primary-text-color);
     }
-    .overview {
-      margin-bottom: 14px;
-    }
-    .surface-summary,
-    .assignment,
     .selected-blueprint {
       border: 1px solid var(--divider-color);
       border-radius: 8px;
       background: var(--card-background-color);
     }
-    .surface-summary {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px;
-    }
-    .surface-title,
-    .assignment-name,
     .selected-name {
       font-weight: 600;
     }
-    .surface-desc,
     .choice-desc,
     .selected-version,
     .hint,
-    .empty,
     small {
       color: var(--secondary-text-color);
       font-size: 12px;
     }
-    .count,
-    .target-pill,
-    .choice-tags span,
-    .assignment-meta span {
+    .hint.intro {
+      margin: 0 0 12px;
+    }
+    .choice-tags span {
       border-radius: 999px;
       padding: 2px 8px;
       background: var(--secondary-background-color);
@@ -552,83 +476,17 @@ export class DwainsReplacementManagerDialog extends LitElement {
       font-size: 12px;
       white-space: nowrap;
     }
-    .count {
-      color: var(--primary-color);
-      background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12);
-      font-weight: 700;
-    }
-    .assignment-section,
-    .builder {
-      margin-top: 18px;
-    }
-    .section-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .section-header h3 {
-      margin: 0;
-      font-size: 15px;
-    }
-    .section-header ha-icon {
-      --mdc-icon-size: 20px;
-      color: var(--primary-color);
-    }
-    .assignment-list {
-      display: grid;
-      gap: 8px;
-    }
-    .assignment {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px;
-    }
-    .assignment.disabled {
-      opacity: 0.58;
-    }
-    .assignment-main {
-      min-width: 0;
-    }
-    .assignment-meta,
     .choice-tags {
       display: flex;
       flex-wrap: wrap;
       gap: 5px;
       margin-top: 6px;
     }
-    .assignment-actions {
-      display: flex;
-      gap: 6px;
-    }
-    .icon-button {
-      width: 34px;
-      height: 34px;
-      border: 0;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--primary-text-color);
-      background: var(--secondary-background-color);
-    }
-    .icon-button:hover {
-      color: var(--primary-color);
-    }
-    .icon-button.danger:hover {
-      color: var(--error-color);
-    }
-    .builder {
-      border-top: 1px solid var(--divider-color);
-      padding-top: 16px;
-    }
-    .builder-grid {
+    .builder-controls {
       display: grid;
-      grid-template-columns: minmax(220px, 360px);
+      grid-template-columns: minmax(180px, 260px) minmax(220px, 1fr);
       gap: 12px;
+      margin-bottom: 12px;
     }
     .control-block {
       display: flex;
@@ -653,11 +511,13 @@ export class DwainsReplacementManagerDialog extends LitElement {
       color: var(--primary-text-color);
       font-size: 14px;
     }
-    .gallery-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 14px 0 8px;
+    select:disabled {
+      opacity: 0.7;
+    }
+    .loading {
+      margin-bottom: 8px;
+      color: var(--secondary-text-color);
+      font-size: 13px;
     }
     .gallery {
       display: grid;
@@ -719,56 +579,21 @@ export class DwainsReplacementManagerDialog extends LitElement {
       color: var(--error-color);
       margin-bottom: 10px;
     }
-    .empty {
-      border: 1px dashed var(--divider-color);
-      border-radius: 8px;
-      padding: 12px;
-    }
     @media (max-width: 760px) {
       :host {
         --mdc-dialog-min-width: 96vw;
       }
-      .overview,
-      .builder-grid,
+      .builder-controls,
       .gallery,
       .input-grid {
         grid-template-columns: 1fr;
       }
-      .assignment,
       .selected-header {
         align-items: stretch;
         flex-direction: column;
       }
-      .assignment-actions {
-        justify-content: flex-end;
-      }
     }
   `;
-}
-
-function cloneReplacements(replacements: BlueprintReplacements): BlueprintReplacements {
-  return {
-    area_cards: cloneGroup(replacements.area_cards),
-    devices_cards: cloneGroup(replacements.devices_cards),
-  };
-}
-
-function cloneGroup(group?: BlueprintReplacementGroup): BlueprintReplacementGroup {
-  return {
-    by_domain: { ...(group?.by_domain || {}) },
-    by_device_class: { ...(group?.by_device_class || {}) },
-    by_entity: { ...(group?.by_entity || {}) },
-  };
-}
-
-function scoreGallery(item: GalleryItem, target: string): number {
-  if (!target) return 0;
-  const haystack = `${item.name} ${item.description || ''} ${(item.custom_cards || []).join(' ')}`.toLowerCase();
-  if (inferBlueprintDomain(item) === target) return 8;
-  const domain = target.split(':')[0] || target;
-  if (haystack.includes(target)) return 4;
-  if (haystack.includes(domain)) return 3;
-  return 0;
 }
 
 function inferBlueprintDomain(item: GalleryItem, parsed?: ParsedBlueprint): string {
@@ -807,7 +632,8 @@ function isPopupBlueprint(item: any): boolean {
 export function openReplacementManager(
   hass: HomeAssistant,
   config: DwainsDashboardConfig,
-  onSave: (config: DwainsDashboardConfig) => void
+  onSave: (config: DwainsDashboardConfig) => void,
+  initialDomain?: string
 ): void {
   // Mount inside <home-assistant>, where Home Assistant mounts its own dialogs,
   // so cards and controls can reach the context it provides.
@@ -820,7 +646,7 @@ export function openReplacementManager(
     root.appendChild(dlg);
   }
   dlg.hass = hass;
-  dlg.showDialog({ config, onSave });
+  dlg.showDialog({ config, onSave, initialDomain });
 }
 
 declare global {

@@ -32,7 +32,7 @@ import {
   sortAreas,
   type AreaStrategyGroup
 } from "../utils/area-entities";
-import { countReplacementRules } from "../utils/blueprint-replacements";
+import { countReplacementRules, domainReplacementEntries, setDomainReplacement } from "../utils/blueprint-replacements";
 import { persistableConfig } from "../utils/dashboard-config";
 import { isHiddenAsUnavailable } from "../utils/entity-availability";
 import { isConfigEntityInArea, resolveStatusEntityAreaId } from "../utils/entity-lookups";
@@ -1064,6 +1064,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _renderReplacementsSettingsPanel() {
+    const entries = this._replacementEntries();
     return this._renderSettingsPanel(
       "mdi:puzzle-edit-outline",
       this._t('settings.blueprint_replacements'),
@@ -1075,14 +1076,89 @@ export class DwainsDashboardStrategyEditor extends LitElement {
               <div class="replacement-count">${this._tp('common.active', this._replacementCount())}</div>
               <div class="replacement-help">${this._t('replacement.views_description')}</div>
             </div>
-            <ha-button appearance="accent" @click=${this._openReplacementManager}>
-              <ha-icon icon="mdi:puzzle-edit-outline"></ha-icon>
-              ${this._t('common.manage')}
+            <ha-button appearance="accent" @click=${() => this._openReplacementManager()}>
+              <ha-icon icon="mdi:plus"></ha-icon>
+              ${this._t('replacement.assign')}
             </ha-button>
           </div>
+          ${entries.length ? html`
+            <div class="home-info-card-list replacement-list">
+              ${repeat(
+                entries,
+                (entry) => entry.domain,
+                ({ domain, assignment }) => {
+                  const enabled = assignment.enabled !== false;
+                  const domainName = getDomainName(this.hass, domain);
+                  return html`
+                    <div class="home-info-card-item ${enabled ? '' : 'disabled'}">
+                      <div class="home-section-icon"><ha-icon .icon=${getDomainIcon(domain)}></ha-icon></div>
+                      <div class="home-section-copy">
+                        <div class="home-section-title">${domainName}</div>
+                        <div class="home-section-description">
+                          ${assignment.name}${assignment.version ? ` (v${assignment.version})` : ''}
+                        </div>
+                      </div>
+                      <div class="home-section-actions">
+                        <ha-switch
+                          .checked=${enabled}
+                          aria-label=${this._t('replacement.enabled_label', { domain: domainName })}
+                          title=${this._t('replacement.enabled_label', { domain: domainName })}
+                          @change=${(event: Event) =>
+                            this._setReplacementEnabled(domain, (event.target as HTMLInputElement).checked)}
+                        ></ha-switch>
+                        <ha-icon-button
+                          .label=${this._t('common.edit')}
+                          .path=${mdiPencil}
+                          @click=${() => this._openReplacementManager(domain)}
+                        ></ha-icon-button>
+                        <ha-icon-button
+                          .label=${this._t('common.delete')}
+                          .path=${mdiDelete}
+                          @click=${() => this._removeReplacement(domain)}
+                        ></ha-icon-button>
+                      </div>
+                    </div>
+                  `;
+                }
+              )}
+            </div>
+          ` : html`<div class="home-camera-settings-empty">${this._t('replacement.empty')}</div>`}
         </div>
       `
     );
+  }
+
+  private _replacementEntries() {
+    return domainReplacementEntries(this._config?.blueprint_replacements).sort((a, b) =>
+      getDomainName(this.hass, a.domain).localeCompare(getDomainName(this.hass, b.domain))
+    );
+  }
+
+  private _setReplacementEnabled(domain: string, enabled: boolean): void {
+    if (!this._config) return;
+    const current = domainReplacementEntries(this._config.blueprint_replacements)
+      .find((entry) => entry.domain === domain)?.assignment;
+    if (!current) return;
+    this._fireConfigChanged({
+      ...this._config,
+      blueprint_replacements: setDomainReplacement(this._config.blueprint_replacements, domain, { ...current, enabled }),
+    });
+  }
+
+  private async _removeReplacement(domain: string): Promise<void> {
+    const domainName = getDomainName(this.hass, domain);
+    const confirmed = await showConfirmDialog(this, {
+      hass: this.hass,
+      title: this._t('replacement.remove_confirm', { domain: domainName }),
+      message: this._t('replacement.remove_message', { domain: domainName }),
+      confirmLabel: this._t('common.delete'),
+      destructive: true,
+    });
+    if (!confirmed || !this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      blueprint_replacements: setDomainReplacement(this._config.blueprint_replacements, domain, undefined),
+    });
   }
 
   private _renderFavoritesSettingsPanel() {
@@ -4824,12 +4900,13 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     fireEvent(this, 'hass-notification', { message });
   }
 
-  private _openReplacementManager(): void {
+  private _openReplacementManager(initialDomain?: string): void {
     if (!this.hass || !this._config) return;
     openReplacementManager(this.hass, this._config, (config) => {
-      this._fireConfigChanged(config);
+      if (!this._config) return;
+      this._fireConfigChanged({ ...this._config, blueprint_replacements: config.blueprint_replacements || {} });
       this.requestUpdate();
-    });
+    }, initialDomain);
   }
 
   private _replacementCount(): number {
@@ -6351,6 +6428,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
         font-size: 12px;
         color: var(--secondary-text-color);
         line-height: 1.4;
+      }
+
+      .replacement-list {
+        margin-top: 12px;
+      }
+
+      .replacement-section .home-camera-settings-empty {
+        margin-top: 12px;
       }
 
       .replacement-summary ha-button ha-icon {

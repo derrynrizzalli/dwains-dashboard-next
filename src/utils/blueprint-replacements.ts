@@ -167,6 +167,42 @@ function matchReplacementGroup(
   );
 }
 
+const DOMAIN_SURFACES: BlueprintReplacementSurface[] = ['area_cards', 'devices_cards'];
+
+/** The domain replacements, one per domain, as used by both views. */
+export function domainReplacementEntries(
+  replacements?: BlueprintReplacements
+): Array<{ domain: string; assignment: BlueprintReplacementAssignment }> {
+  const found = new Map<string, BlueprintReplacementAssignment>();
+  for (const surface of DOMAIN_SURFACES) {
+    for (const [domain, assignment] of Object.entries(replacements?.[surface]?.by_domain || {})) {
+      if (assignment && !found.has(domain)) found.set(domain, assignment);
+    }
+  }
+  return Array.from(found, ([domain, assignment]) => ({ domain, assignment }));
+}
+
+/**
+ * Set the replacement of a domain in both views, or remove it when
+ * `assignment` is undefined. Returns new replacements and leaves the given
+ * ones unchanged.
+ */
+export function setDomainReplacement(
+  replacements: BlueprintReplacements | undefined,
+  domain: string,
+  assignment: BlueprintReplacementAssignment | undefined
+): BlueprintReplacements {
+  const next: BlueprintReplacements = { ...(replacements || {}) };
+  for (const surface of DOMAIN_SURFACES) {
+    const group = next[surface] || {};
+    const byDomain = { ...(group.by_domain || {}) };
+    if (assignment) byDomain[domain] = assignment;
+    else delete byDomain[domain];
+    next[surface] = { ...group, by_domain: byDomain };
+  }
+  return next;
+}
+
 export function countReplacementAssignments(group?: BlueprintReplacementGroup): number {
   if (!group) return 0;
   return (

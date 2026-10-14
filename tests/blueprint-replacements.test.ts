@@ -3,8 +3,10 @@ import {
   countReplacementAssignments,
   countReplacementRules,
   defaultEntityCardConfig,
+  domainReplacementEntries,
   findReplacementAssignment,
   resolveEntityCardConfig,
+  setDomainReplacement,
 } from '../src/utils/blueprint-replacements';
 import type { BlueprintReplacementAssignment, DwainsDashboardConfig } from '../src/types/strategy';
 import { entityState, hassWithStates } from './helpers';
@@ -236,5 +238,35 @@ describe('replacement counters', () => {
         devices_cards: { by_domain: { light: assignment('a'), fan: assignment('c') } },
       })
     ).toBe(3);
+  });
+});
+
+describe('domain replacements', () => {
+  const light = assignment('Light card');
+  const fan = assignment('Fan card');
+
+  it('lists each domain once, preferring the area view', () => {
+    const entries = domainReplacementEntries({
+      area_cards: { by_domain: { light } },
+      devices_cards: { by_domain: { light: assignment('Other'), fan }, by_entity: { 'light.a': light } },
+    });
+    expect(entries).toEqual([
+      { domain: 'light', assignment: light },
+      { domain: 'fan', assignment: fan },
+    ]);
+    expect(domainReplacementEntries(undefined)).toEqual([]);
+  });
+
+  it('sets and removes a domain in both views without changing the input', () => {
+    const before = { area_cards: { by_entity: { 'light.a': light } } };
+    const added = setDomainReplacement(before, 'fan', fan);
+    expect(added.area_cards).toEqual({ by_entity: { 'light.a': light }, by_domain: { fan } });
+    expect(added.devices_cards).toEqual({ by_domain: { fan } });
+    expect(before).toEqual({ area_cards: { by_entity: { 'light.a': light } } });
+
+    const removed = setDomainReplacement(added, 'fan', undefined);
+    expect(removed.area_cards?.by_domain).toEqual({});
+    expect(removed.devices_cards?.by_domain).toEqual({});
+    expect(added.area_cards?.by_domain).toEqual({ fan });
   });
 });
