@@ -808,5 +808,7 @@ export const zhHans = {
   'settings.manage_favorites': "管理我的最爱",
   'settings.favorite_suggestions_on': "建议已开启",
   'settings.favorite_suggestions_off': "建议已关闭",
+  'settings.hide_group': "隐藏群组",
+  'settings.show_group': "显示群组",
 
 } as const satisfies TranslationDictionary;

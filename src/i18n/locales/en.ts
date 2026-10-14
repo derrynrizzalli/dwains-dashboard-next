@@ -831,6 +831,8 @@ export const en = {
   'settings.manage_favorites': "Manage favorites",
   'settings.favorite_suggestions_on': "Suggestions on",
   'settings.favorite_suggestions_off': "Suggestions off",
+  'settings.hide_group': "Hide group",
+  'settings.show_group': "Show group",
 
 } as const;
 

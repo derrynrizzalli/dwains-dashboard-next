@@ -810,5 +810,7 @@ export const es = {
   'settings.manage_favorites': "Gestionar favoritos",
   'settings.favorite_suggestions_on': "Sugerencias activadas",
   'settings.favorite_suggestions_off': "Sugerencias desactivadas",
+  'settings.hide_group': "Ocultar grupo",
+  'settings.show_group': "Mostrar grupo",
 
 } as const satisfies TranslationDictionary;

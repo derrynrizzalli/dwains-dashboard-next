@@ -833,5 +833,7 @@ export const ru = {
   'settings.manage_favorites': "Управлять избранным",
   'settings.favorite_suggestions_on': "Предложения включены",
   'settings.favorite_suggestions_off': "Предложения выключены",
+  'settings.hide_group': "Скрыть группу",
+  'settings.show_group': "Показать группу",
 
 } as const satisfies TranslationDictionary;

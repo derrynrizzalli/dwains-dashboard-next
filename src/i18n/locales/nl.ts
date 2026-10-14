@@ -810,5 +810,7 @@ export const nl = {
   'settings.manage_favorites': "Favorieten beheren",
   'settings.favorite_suggestions_on': "Suggesties aan",
   'settings.favorite_suggestions_off': "Suggesties uit",
+  'settings.hide_group': "Groep verbergen",
+  'settings.show_group': "Groep tonen",
 
 } as const satisfies TranslationDictionary;

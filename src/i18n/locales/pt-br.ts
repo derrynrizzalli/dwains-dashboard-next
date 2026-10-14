@@ -833,4 +833,6 @@ export const ptBR = {
   'settings.manage_favorites': "Gerenciar favoritos",
   'settings.favorite_suggestions_on': "Sugestões ativadas",
   'settings.favorite_suggestions_off': "Sugestões desativadas",
+  'settings.hide_group': "Ocultar grupo",
+  'settings.show_group': "Mostrar grupo",
 } as const satisfies TranslationDictionary;

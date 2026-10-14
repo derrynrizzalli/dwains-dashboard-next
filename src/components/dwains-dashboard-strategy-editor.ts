@@ -64,6 +64,13 @@ import {
 } from "../utils/home-scenes";
 import { DD_NEXT_VERSION } from "../version";
 import {
+  countHidden,
+  groupHiddenIds,
+  groupVisibility,
+  hidesOnToggle,
+  type GroupVisibility,
+} from "../utils/visibility";
+import {
   MASTER_ACTION_CONFIRMATION_DOMAINS,
   masterActionConfirmationEnabled,
 } from "../utils/master-action-confirmations";
@@ -250,6 +257,10 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   @state()
   private _draggedAreaCustomCardId?: string;
+
+  /** Entity groups folded in the room settings. */
+  @state()
+  private _collapsedAreaGroups: ReadonlySet<string> = new Set();
 
   @state()
   private _dragOverAreaCustomCardTarget?: { placement: string; index: number };
@@ -1884,7 +1895,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
               ${this._renderAreaCustomCardDropZone(`ungrouped:${sortedUngroupedEntities.length}`)}
             </div>
           </ha-expansion-panel>
-        ` : groupedSections.map((group, groupIndex) => {
+        ` : repeat(groupedSections, (group) => group, (group, groupIndex) => {
           // Get ALL entities for this group (don't filter hidden ones)
           const allGroupEntities = groups[group] || [];
           const groupOptions = this._config!.areas_options?.[this._area!]?.groups_options?.[group];
@@ -1903,18 +1914,37 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             const nameB = this.hass!.states[b]?.attributes?.friendly_name || b;
             return nameA.localeCompare(nameB);
           });
+          const groupHiddenCount = countHidden(allGroupEntities, hiddenEntities);
+          const groupVisibilityState = groupVisibility(allGroupEntities.length, groupHiddenCount);
 
           return html`
             <div
-              class="area-entity-section ${this._draggedEntitySection === group ? 'dragging' : ''} ${this._dragOverEntitySection === group ? 'drag-over' : ''}"
+              class="area-entity-section ${groupVisibilityState === 'hidden' ? 'is-hidden' : ''} ${this._draggedEntitySection === group ? 'dragging' : ''} ${this._dragOverEntitySection === group ? 'drag-over' : ''}"
               @dragover=${(event: DragEvent) => this._handleEntitySectionDragOver(event, group)}
               @drop=${(event: DragEvent) => this._handleEntitySectionDrop(event, group, groupedSections)}
             >
-              <ha-expansion-panel expanded outlined>
+              <ha-expansion-panel
+                outlined
+                .expanded=${!this._collapsedAreaGroups.has(group)}
+                @expanded-changed=${(event: CustomEvent<{ expanded: boolean }>) => this._handleAreaGroupExpandedChanged(event, group)}
+              >
                 <div slot="header" class="area-entity-section-header">
                   <ha-icon icon=${AREA_STRATEGY_GROUP_ICONS[group]}></ha-icon>
-                  <span>${this._getGroupTitle(group)}</span>
+                  <span class="area-entity-section-title">
+                    ${this._getGroupTitle(group)}
+                    ${groupVisibilityState !== 'visible' ? html`
+                      <small>${this._t('settings.visible_count', {
+                        visible: allGroupEntities.length - groupHiddenCount,
+                        total: allGroupEntities.length,
+                      })}</small>
+                    ` : nothing}
+                  </span>
                   <span class="area-entity-section-actions">
+                    ${allGroupEntities.length ? this._renderVisibilityButton(
+                      groupVisibilityState,
+                      hidesOnToggle(groupVisibilityState) ? this._t('settings.hide_group') : this._t('settings.show_group'),
+                      () => this._setAreaEntityGroupHidden(group, allGroupEntities, hidesOnToggle(groupVisibilityState))
+                    ) : nothing}
                     <ha-icon-button
                       .label=${this._t('settings.move_up')}
                       .path=${mdiArrowUp}
@@ -1980,7 +2010,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                             ${this._areaEditorEntityName(entityId, area.name)}
                           </span>
                           <ha-icon-button
-                            .label=${isHidden ? "Show" : "Hide"}
+                            .label=${isHidden ? this._t('common.show') : this._t('common.hide')}
                             .path=${isHidden ? mdiEye : mdiEyeOff}
                             @click=${() => this._toggleEntityVisibility(entityId, group)}
                           ></ha-icon-button>
@@ -4189,6 +4219,69 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
   private _editArea(area: string): void {
     this._area = area;
+    this._collapsedAreaGroups = new Set();
+  }
+
+  private _handleAreaGroupExpandedChanged(event: CustomEvent<{ expanded: boolean }>, group: string): void {
+    if (event.target !== event.currentTarget) return;
+    const collapsed = !event.detail?.expanded;
+    if (this._collapsedAreaGroups.has(group) === collapsed) return;
+    const next = new Set(this._collapsedAreaGroups);
+    if (collapsed) next.add(group);
+    else next.delete(group);
+    this._collapsedAreaGroups = next;
+  }
+
+  /**
+   * Hides or shows a whole entity group of the room. Hiding stores the
+   * entities the group has now, so entities added later are still shown.
+   */
+  private _setAreaEntityGroupHidden(group: string, entityIds: string[], hidden: boolean): void {
+    if (!this._config || !this._area) return;
+    const areaOptions = this._config.areas_options?.[this._area];
+    const groupOptions = areaOptions?.groups_options?.[group];
+
+    this._fireConfigChanged({
+      ...this._config,
+      areas_options: {
+        ...this._config.areas_options,
+        [this._area]: {
+          ...areaOptions,
+          groups_options: {
+            ...areaOptions?.groups_options,
+            [group]: {
+              ...groupOptions,
+              hidden: groupHiddenIds(groupOptions?.hidden, entityIds, hidden),
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private _visibilityIcon(visibility: GroupVisibility): string {
+    if (visibility === 'hidden') return 'mdi:eye-off-outline';
+    return visibility === 'partial' ? 'mdi:eye-minus-outline' : 'mdi:eye-outline';
+  }
+
+  /** Eye button of a group: shows whether it is visible, partly hidden or hidden. */
+  private _renderVisibilityButton(visibility: GroupVisibility, label: string, onClick: () => void) {
+    return html`
+      <button
+        class="visibility-button is-${visibility}"
+        type="button"
+        title=${label}
+        aria-label=${label}
+        aria-pressed=${visibility === 'hidden' ? 'false' : 'true'}
+        @click=${(event: Event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        @keydown=${(event: KeyboardEvent) => event.stopPropagation()}
+      >
+        <ha-icon icon=${this._visibilityIcon(visibility)}></ha-icon>
+      </button>
+    `;
   }
 
   private _addFavoriteEntity(): void {
@@ -5816,6 +5909,53 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       .area-entity-section-header > span:not(.area-entity-section-actions) {
         min-width: 0;
         flex: 1;
+      }
+
+      .area-entity-section-title small {
+        margin-left: 8px;
+        color: var(--secondary-text-color);
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .area-entity-section.is-hidden ha-expansion-panel {
+        opacity: 0.62;
+      }
+
+      .visibility-button {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 auto;
+        border: 0;
+        border-radius: 999px;
+        color: var(--secondary-text-color);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .visibility-button:hover {
+        background: color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+        color: var(--primary-text-color);
+      }
+
+      .visibility-button:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 1px;
+      }
+
+      .visibility-button.is-partial {
+        color: var(--primary-color);
+      }
+
+      .visibility-button.is-hidden {
+        color: var(--disabled-text-color, var(--secondary-text-color));
+      }
+
+      .visibility-button ha-icon {
+        --mdc-icon-size: 20px;
       }
 
       .area-entity-section-actions {
