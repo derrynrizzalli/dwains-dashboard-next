@@ -795,5 +795,7 @@ export const es = {
   'settings.home_outdoor_climate_areas_title': "Áreas exteriores",
   'settings.home_outdoor_climate_areas_description': "Elige qué áreas de Home Assistant están en el exterior. Sus sensores de temperatura y humedad asignados se muestran en la tarjeta Clima exterior y no cuentan para el clima interior.",
   'settings.home_climate_area_outdoor': "Usada para el clima exterior",
+  'settings.hide_area_name': "Quitar el nombre de la habitación de los nombres de entidades",
+  'settings.hide_area_name_description': "Las páginas de habitaciones, la página de dispositivos y las listas de dispositivos ya muestran la habitación, así que \"Salón Lámpara de techo\" se muestra como \"Lámpara de techo\". Solo se quita el nombre completo de la habitación al principio o al final de un nombre, también entre paréntesis.",
 
 } as const satisfies TranslationDictionary;

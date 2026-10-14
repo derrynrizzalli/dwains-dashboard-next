@@ -58,6 +58,11 @@ export interface DwainsDashboardSettings {
   hidden_persons?: string[];
   hide_unavailable_entities?: boolean;
   hide_unavailable_entities_on_devices?: boolean;
+  /**
+   * Drop the area name from entity names on pages and groups that already show
+   * the area. Default on; only `false` turns it off.
+   */
+  hide_area_name_in_entity_names?: boolean;
   show_recent_devices_panel?: boolean;
   restrict_non_admin_ha_sidebar?: boolean;
   restrict_non_admin_dashboard_settings?: boolean;

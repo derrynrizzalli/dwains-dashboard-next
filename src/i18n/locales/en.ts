@@ -816,6 +816,8 @@ export const en = {
   'settings.home_outdoor_climate_areas_title': "Outdoor areas",
   'settings.home_outdoor_climate_areas_description': "Choose which Home Assistant areas are outdoors. Their assigned temperature and humidity sensors are shown in the Outdoor climate card and left out of the indoor climate.",
   'settings.home_climate_area_outdoor': "Used for outdoor climate",
+  'settings.hide_area_name': "Leave the room name out of entity names",
+  'settings.hide_area_name_description': "Room pages, the Devices page and device lists already show the room, so \"Living room Ceiling light\" is shown as \"Ceiling light\". Only the whole room name at the start or end of a name is removed, also between brackets.",
 
 } as const;
 

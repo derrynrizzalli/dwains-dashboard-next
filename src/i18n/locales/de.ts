@@ -795,5 +795,7 @@ export const de = {
   'settings.home_outdoor_climate_areas_title': "Außenbereiche",
   'settings.home_outdoor_climate_areas_description': "Lege fest, welche Home-Assistant-Bereiche draußen liegen. Ihre zugewiesenen Temperatur- und Feuchtigkeitssensoren erscheinen in der Karte Außenklima und zählen nicht zum Raumklima.",
   'settings.home_climate_area_outdoor': "Für das Außenklima verwendet",
+  'settings.hide_area_name': "Raumnamen in Entitätsnamen weglassen",
+  'settings.hide_area_name_description': "Raumseiten, die Geräteseite und Gerätelisten zeigen den Raum bereits, daher wird \"Wohnzimmer Deckenlampe\" als \"Deckenlampe\" angezeigt. Nur der ganze Raumname am Anfang oder Ende eines Namens wird entfernt, auch in Klammern.",
 
 } as const satisfies TranslationDictionary;

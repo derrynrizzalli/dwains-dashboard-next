@@ -818,4 +818,6 @@ export const ptBR = {
   'settings.home_outdoor_climate_areas_title': "Áreas externas",
   'settings.home_outdoor_climate_areas_description': "Escolha quais áreas do Home Assistant ficam ao ar livre. Os sensores de temperatura e umidade atribuídos a elas aparecem no cartão Clima externo e não entram no clima interno.",
   'settings.home_climate_area_outdoor': "Usada para o clima externo",
+  'settings.hide_area_name': "Remover o nome do cômodo dos nomes das entidades",
+  'settings.hide_area_name_description': "As páginas dos cômodos, a página de dispositivos e as listas de dispositivos já mostram o cômodo, então \"Sala Luz do teto\" aparece como \"Luz do teto\". Só o nome inteiro do cômodo no início ou no fim de um nome é removido, também entre parênteses.",
 } as const satisfies TranslationDictionary;

@@ -28,7 +28,8 @@ import { getDeviceClassName, getDomainName } from '../utils/domain-names';
 import { filterHiddenDeviceEntities } from '../utils/device-admission';
 import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
 import { restrictNonAdminDashboardSettings } from '../utils/security';
-import { areaEntityDeviceLabel, sortAreas, stripAreaFromEntityName } from '../utils/area-entities';
+import { areaEntityDeviceLabel, sortAreas } from '../utils/area-entities';
+import { areaEntityDisplayName } from '../utils/entity-names';
 import { navigateHomeAssistant } from '../utils/navigation';
 import { syncHassDarkThemeAttribute } from '../utils/theme';
 import { HOME_SECTION_META, normalizeHiddenHomeInformationCards, normalizeHiddenHomeSections, normalizeHomeSectionsOrder } from '../utils/home-sections';
@@ -5478,9 +5479,9 @@ export class DwainsLayoutCard extends LitElement {
 
     const icon = getEntityRegistry(this.hass)[entity.entity_id]?.icon || state.attributes?.icon || getDeviceClassIcon(domain, deviceClass) || getDomainIcon(domain);
     const fullName = state.attributes?.friendly_name || getEntityRegistry(this.hass)[entity.entity_id]?.name || entity.entity_id;
-    // The page already shows the room, so drop a leading area name from the tile
-    // and use the second line for the device when that adds something.
-    const name = stripAreaFromEntityName(fullName, area.name);
+    // The page already shows the room, so drop the area name from the tile
+    // (unless turned off) and use the second line for the device when that adds something.
+    const name = areaEntityDisplayName(fullName, area.name, this.config?.settings);
     const deviceLabel = areaEntityDeviceLabel(name, this._entityDeviceName(entity.entity_id), area.name);
     const active = this._isEntityActiveForUi(state, domain);
     const actionKind = this._mobileEntityActionKind(domain);

@@ -35,6 +35,7 @@ import {
 import { countReplacementRules } from "../utils/blueprint-replacements";
 import { persistableConfig } from "../utils/dashboard-config";
 import { isHiddenAsUnavailable } from "../utils/entity-availability";
+import { areaEntityDisplayName, hidesAreaNameInEntityNames } from "../utils/entity-names";
 import { isConfigEntityInArea, resolveStatusEntityAreaId } from "../utils/entity-lookups";
 import { normalizeNowPlayingMode, type NowPlayingMode } from "../utils/now-playing";
 import { getDeviceClassName, getDomainName } from "../utils/domain-names";
@@ -1356,6 +1357,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
             <p class="toggle-description">${this._t('settings.hide_unavailable_areas_description')}</p>
           </div>
           <div class="hide-unavailable-toggle">
+            <ha-formfield .label=${this._t('settings.hide_area_name')}>
+              <ha-switch
+                .checked=${hidesAreaNameInEntityNames(this._config?.settings)}
+                @change=${this._toggleHideAreaName}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">${this._t('settings.hide_area_name_description')}</p>
+          </div>
+          <div class="hide-unavailable-toggle">
             <ha-formfield .label=${this._t('thermostat.setting_label')}>
               <ha-switch
                 .checked=${this._config?.settings?.show_area_thermostat !== false}
@@ -1800,7 +1810,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                         <div class="handle"><ha-svg-icon .path=${mdiDrag}></ha-svg-icon></div>
                         <ha-state-icon .stateObj=${state} class="entity-icon"></ha-state-icon>
                         <span class="entity-name">
-                          ${state?.attributes?.friendly_name || entityId}
+                          ${this._areaEditorEntityName(entityId, area.name)}
                           <small>${this._getGroupTitle(entityGroup)}</small>
                         </span>
                         <div class="entity-order-buttons">
@@ -1925,7 +1935,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
                             class="entity-icon"
                           ></ha-state-icon>
                           <span class="entity-name">
-                            ${state?.attributes?.friendly_name || entityId}
+                            ${this._areaEditorEntityName(entityId, area.name)}
                           </span>
                           <ha-icon-button
                             .label=${isHidden ? "Show" : "Hide"}
@@ -1950,6 +1960,12 @@ export class DwainsDashboardStrategyEditor extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  /** Entity name in the room settings, like the room page shows it. */
+  private _areaEditorEntityName(entityId: string, areaName: string): string {
+    const fullName = this.hass?.states?.[entityId]?.attributes?.friendly_name || entityId;
+    return areaEntityDisplayName(String(fullName), areaName, this._config?.settings);
   }
 
   private _getHomeSectionsOrder(): HomeSectionKey[] {
@@ -4640,6 +4656,17 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
     this._fireConfigChanged(newConfig);
   }
+
+  private _toggleHideAreaName = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      settings: {
+        ...this._config.settings,
+        hide_area_name_in_entity_names: Boolean((e.target as any).checked),
+      },
+    });
+  };
 
   private _toggleAreaThermostat(e: Event): void {
     const target = e.target as any;

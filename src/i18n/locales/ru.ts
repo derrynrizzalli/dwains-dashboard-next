@@ -818,5 +818,7 @@ export const ru = {
   'settings.home_outdoor_climate_areas_title': "Уличные зоны",
   'settings.home_outdoor_climate_areas_description': "Выберите, какие помещения Home Assistant находятся на улице. Их назначенные датчики температуры и влажности показываются в карточке климата на улице и не учитываются в климате в помещении.",
   'settings.home_climate_area_outdoor': "Используется для климата на улице",
+  'settings.hide_area_name': "Убирать название комнаты из названий сущностей",
+  'settings.hide_area_name_description': "Страницы комнат, страница устройств и списки устройств уже показывают комнату, поэтому \"Гостиная Люстра\" отображается как \"Люстра\". Удаляется только полное название комнаты в начале или в конце названия, в том числе в скобках.",
 
 } as const satisfies TranslationDictionary;

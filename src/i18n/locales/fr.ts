@@ -795,5 +795,7 @@ export const fr = {
   'settings.home_outdoor_climate_areas_title': "Espaces extérieurs",
   'settings.home_outdoor_climate_areas_description': "Choisissez quelles pièces de Home Assistant sont à l'extérieur. Leurs capteurs de température et d'humidité attribués apparaissent dans la carte Climat extérieur et ne comptent pas pour le climat intérieur.",
   'settings.home_climate_area_outdoor': "Utilisée pour le climat extérieur",
+  'settings.hide_area_name': "Retirer le nom de la pièce des noms d'entités",
+  'settings.hide_area_name_description': "Les pages des pièces, la page Appareils et les listes d'appareils affichent déjà la pièce, donc \"Salon Plafonnier\" devient \"Plafonnier\". Seul le nom complet de la pièce au début ou à la fin d'un nom est retiré, aussi entre parenthèses.",
 
 } as const satisfies TranslationDictionary;

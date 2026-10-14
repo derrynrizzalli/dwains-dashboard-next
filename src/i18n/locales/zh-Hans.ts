@@ -793,5 +793,7 @@ export const zhHans = {
   'settings.home_outdoor_climate_areas_title': "室外区域",
   'settings.home_outdoor_climate_areas_description': "选择哪些 Home Assistant 区域位于室外。它们指定的温度和湿度传感器会显示在室外气候卡片中，并且不计入室内气候。",
   'settings.home_climate_area_outdoor': "用于室外气候",
+  'settings.hide_area_name': "在实体名称中省略房间名称",
+  'settings.hide_area_name_description': "房间页面、设备页面和设备列表已经显示房间，因此「客厅 吸顶灯」会显示为「吸顶灯」。只会移除名称开头或结尾的完整房间名称，括号内的也会移除。",
 
 } as const satisfies TranslationDictionary;

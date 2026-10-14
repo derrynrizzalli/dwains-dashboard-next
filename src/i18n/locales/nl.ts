@@ -795,5 +795,7 @@ export const nl = {
   'settings.home_outdoor_climate_areas_title': "Buitenruimtes",
   'settings.home_outdoor_climate_areas_description': "Kies welke Home Assistant-ruimtes buiten zijn. Hun gekoppelde temperatuur- en luchtvochtigheidssensoren staan op de kaart Buitenklimaat en tellen niet mee voor het binnenklimaat.",
   'settings.home_climate_area_outdoor': "Gebruikt voor buitenklimaat",
+  'settings.hide_area_name': "Kamernaam weglaten uit entiteitnamen",
+  'settings.hide_area_name_description': "Kamerpagina's, de Apparatenpagina en apparatenlijsten tonen de kamer al, dus \"Woonkamer Plafondlamp\" wordt \"Plafondlamp\". Alleen de hele kamernaam aan het begin of eind van een naam wordt weggelaten, ook tussen haakjes.",
 
 } as const satisfies TranslationDictionary;

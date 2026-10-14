@@ -818,4 +818,6 @@ export const it = {
   'settings.home_outdoor_climate_areas_title': "Zone esterne",
   'settings.home_outdoor_climate_areas_description': "Scegli quali stanze di Home Assistant si trovano all'esterno. I loro sensori di temperatura e umidità assegnati vengono mostrati nella scheda Clima esterno e non contano per il clima interno.",
   'settings.home_climate_area_outdoor': "Usata per il clima esterno",
+  'settings.hide_area_name': "Togli il nome della stanza dai nomi delle entità",
+  'settings.hide_area_name_description': "Le pagine delle stanze, la pagina Dispositivi e gli elenchi dei dispositivi mostrano già la stanza, quindi \"Soggiorno Plafoniera\" diventa \"Plafoniera\". Viene tolto solo il nome intero della stanza all'inizio o alla fine di un nome, anche tra parentesi.",
 } as const satisfies TranslationDictionary;
