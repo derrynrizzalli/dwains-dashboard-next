@@ -297,6 +297,12 @@ export const ru = {
   'status.tamper_detected': 'Обнаружено вскрытие: {count}',
   'status.vibration_detected': 'Обнаружено вибрации: {count}',
   'status.safety_active': 'Активных защитных устройств: {count}',
+  'status.gate_open.one': '{count} открытые ворота',
+  'status.gate_open.other': '{count} открытых ворот',
+  'status.shading_closed.one': '{count} затенение закрыто',
+  'status.shading_closed.other': '{count} затенение закрыто',
+  'domain.cover_gates': 'Ворота',
+  'domain.cover_shading': 'Затенение',
 
   'action.turn_on': 'Включить',
   'action.activate': 'Активировать',

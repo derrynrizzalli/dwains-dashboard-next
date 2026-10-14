@@ -1967,7 +1967,7 @@ export class DwainsLayoutCard extends LitElement {
         <div class="header-status-scroll">
           ${repeat(
             domains,
-            d => `${d.domain}-${d.deviceClass || d.name}`,
+            d => `${d.domain}-${d.statusKind || d.deviceClass || d.name}`,
             domain => html`
               <div
                 class="status-card-compact ${domain.domain} ${domain.value ? 'has-value' : ''} header-card"
@@ -2070,7 +2070,15 @@ export class DwainsLayoutCard extends LitElement {
 
     if (domain.domain === 'light') return this._statusPair('status.light_on');
     if (domain.domain === 'switch') return this._statusPair('status.switch_on');
-    if (domain.domain === 'cover') return this._statusPair('status.cover_open');
+    if (domain.domain === 'cover') {
+      switch (domain.statusKind) {
+        case 'window': return this._statusPair('status.window_open');
+        case 'door': return this._statusPair('status.door_open');
+        case 'gate': return this._statusPair('status.gate_open');
+        case 'shading': return this._statusPair('status.shading_closed');
+        default: return this._statusPair('status.cover_open');
+      }
+    }
     if (domain.domain === 'fan') return this._statusPair('status.fan_on');
     if (domain.domain === 'lock') return this._statusPair('status.lock_unlocked');
     if (domain.domain === 'climate') return this._statusPair('status.climate_active');
@@ -7091,6 +7099,8 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _statusDeviceDomainKey(domain: DomainCount): string {
+    // The devices page has one cover group; the chips split covers per kind.
+    if (domain.domain === 'cover') return 'cover';
     return domain.deviceClass ? `${domain.domain}.${domain.deviceClass}` : domain.domain;
   }
 

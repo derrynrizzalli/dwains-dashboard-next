@@ -101,6 +101,7 @@ export const getAlertIcon = (deviceClass?: string): string => {
     heat: 'mdi:fire-alert',
     cold: 'mdi:snowflake-alert',
     gas: 'mdi:gas-cylinder',
+    tamper: 'mdi:lock-alert',
     vibration: 'mdi:vibrate'
   };
   return icons[deviceClass] || 'mdi:alert';

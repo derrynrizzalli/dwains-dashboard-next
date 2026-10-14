@@ -7,10 +7,13 @@ import {
   resolveStatusEntityAreaId,
 } from './entity-lookups';
 import { isEntityVisibleInArea } from './entity-visibility';
-import { getDeviceClassIcon, getDomainIcon } from './icons';
+import { getAlertIcon, getDeviceClassIcon, getDomainIcon } from './icons';
 import { buildHousePowerUsage } from './power-usage';
 import { getStateIndex } from './state-index';
 import { getEntityRegistry } from './entity-registry';
+import { coverStatusKind, isCoverStatusActive, type CoverStatusKind } from './cover-status';
+
+export { coverStatusKind, isCoverStatusActive, type CoverStatusKind } from './cover-status';
 
 export interface DomainCount {
   domain: string;
@@ -19,6 +22,8 @@ export interface DomainCount {
   icon: string;
   value?: string;
   deviceClass?: string;
+  /** For covers: the chip the cover is counted in. */
+  statusKind?: CoverStatusKind;
   entities?: string[]; // de 'aan'-entiteiten van dit domein
 }
 
@@ -44,21 +49,41 @@ const DOMAIN_CONFIG: Record<string, { icon: string }> = {
   alarm_control_panel: { icon: getDomainIcon('alarm_control_panel') }
 };
 
-// Binary sensor device classes configuration
+// Binary sensor device classes configuration. Chips only show active sensors,
+// so the alert classes use their "active" icon (open window, open door, ...).
 const BINARY_SENSOR_CONFIG: Record<string, { icon: string }> = {
-  window: { icon: getDeviceClassIcon('binary_sensor', 'window') },
-  door: { icon: getDeviceClassIcon('binary_sensor', 'door') },
+  window: { icon: getAlertIcon('window') },
+  door: { icon: getAlertIcon('door') },
   motion: { icon: getDeviceClassIcon('binary_sensor', 'motion') },
-  smoke: { icon: getDeviceClassIcon('binary_sensor', 'smoke') },
+  smoke: { icon: getAlertIcon('smoke') },
   gas: { icon: getDeviceClassIcon('binary_sensor', 'gas') },
-  moisture: { icon: getDeviceClassIcon('binary_sensor', 'moisture') },
+  moisture: { icon: getAlertIcon('moisture') },
   occupancy: { icon: getDeviceClassIcon('binary_sensor', 'occupancy') },
   opening: { icon: getDeviceClassIcon('binary_sensor', 'opening') },
   presence: { icon: getDeviceClassIcon('binary_sensor', 'presence') },
   safety: { icon: getDeviceClassIcon('binary_sensor', 'safety') },
-  tamper: { icon: getDeviceClassIcon('binary_sensor', 'tamper') },
+  tamper: { icon: getAlertIcon('tamper') },
   vibration: { icon: getDeviceClassIcon('binary_sensor', 'vibration') }
 };
+
+// Covers are split in one chip per kind, in this order.
+const COVER_STATUS_KINDS: readonly CoverStatusKind[] = ['window', 'door', 'gate', 'shading'];
+
+const COVER_STATUS_ICONS: Record<CoverStatusKind, string> = {
+  window: getAlertIcon('window'),
+  door: getAlertIcon('door'),
+  gate: 'mdi:gate-open',
+  shading: 'mdi:blinds-horizontal-closed',
+};
+
+function coverStatusName(hass: HomeAssistant, kind: CoverStatusKind): string {
+  switch (kind) {
+    case 'window': return getDeviceClassName(hass, 'window');
+    case 'door': return getDeviceClassName(hass, 'door');
+    case 'gate': return getDomainName(hass, 'cover_gates');
+    default: return getDomainName(hass, 'cover_shading');
+  }
+}
 
 const STATUS_DOMAINS: ReadonlySet<string> = new Set(Object.keys(DOMAIN_CONFIG));
 const STATUS_BINARY_SENSOR_CLASSES: ReadonlySet<string> = new Set(Object.keys(BINARY_SENSOR_CONFIG));
@@ -139,7 +164,7 @@ export function getGroupMemberIds(state: HassEntity | undefined): string[] {
 
 /**
  * Group entities are skipped when at least one of their members is counted
- * on its own, so "Covers open" counts the physical covers and not the group
+ * on its own, so a cover chip counts the physical covers and not the group
  * on top of them. A group whose members are all hidden or outside the
  * dashboard still counts as one entity. Member visibility is decided by the
  * registry and the dashboard config only, not by the member's current
@@ -193,6 +218,12 @@ export function getStatusDomains(hass: HomeAssistant, config: any): DomainCount[
     binarySensorCounts[deviceClass] = { total: 0, on: 0, entities: [] };
   });
 
+  // Covers per status kind (windows, doors, gates and shading)
+  const coverCounts = {} as Record<CoverStatusKind, { total: number; on: number; entities: string[] }>;
+  COVER_STATUS_KINDS.forEach(kind => {
+    coverCounts[kind] = { total: 0, on: 0, entities: [] };
+  });
+
   const addOn = (bucket: { on: number; entities: string[] }, id: string) => {
     bucket.on++;
     bucket.entities.push(id);
@@ -208,6 +239,13 @@ export function getStatusDomains(hass: HomeAssistant, config: any): DomainCount[
     if (UNAVAILABLE_STATES.includes((entityState as any).state)) return;
 
 
+
+    if (domain === 'cover') {
+      const coverCount = coverCounts[coverStatusKind(entityState)];
+      coverCount.total++;
+      if (isCoverStatusActive(entityState)) addOn(coverCount, entityId);
+      return;
+    }
 
     // Handle regular domains
     if (domain in domainCounts) {
@@ -238,11 +276,6 @@ export function getStatusDomains(hass: HomeAssistant, config: any): DomainCount[
       } else if (domain === 'media_player') {
         // Count only actively playing media players. Paused is not considered "on".
         if (ACTIVE_MEDIA_PLAYER_STATES.includes(state)) {
-          if (domainCount) addOn(domainCount, entityId);
-        }
-      } else if (domain === 'cover') {
-        // Count open covers
-        if (state === 'open' || state === 'opening') {
           if (domainCount) addOn(domainCount, entityId);
         }
       } else if (domain === 'lock') {
@@ -296,13 +329,13 @@ export function getStatusDomains(hass: HomeAssistant, config: any): DomainCount[
     if (config) {
       // Logic: if <= 2 persons, show home count, if > 2 persons, show home vs total
       if (personData.total <= 2) {
-        // Show individual status: "2 home" or "1 home" etc
+        // "Home" with the count in the badge, or "Nobody home"
         result.push({
           domain: 'person',
           count: personData.on,
           name: personData.on === 0
             ? ddLocalize(hass, 'person.nobody_home')
-            : `${personData.on} ${ddLocalize(hass, 'person.home').toLowerCase()}`,
+            : ddLocalize(hass, 'person.home'),
           icon: config.icon
         });
       } else {
@@ -320,6 +353,22 @@ export function getStatusDomains(hass: HomeAssistant, config: any): DomainCount[
   // Add other domain cards - only show if something is on (excluding person)
   Object.entries(domainCounts).forEach(([domain, data]) => {
     if (domain === 'person') return; // Already handled above
+    if (domain === 'cover') {
+      // One chip per kind: open windows, doors and gates, and closed shading.
+      COVER_STATUS_KINDS.forEach(kind => {
+        const cover = coverCounts[kind];
+        if (!cover.on) return;
+        result.push({
+          domain: 'cover',
+          statusKind: kind,
+          count: cover.on,
+          name: coverStatusName(hass, kind),
+          icon: COVER_STATUS_ICONS[kind],
+          entities: cover.entities
+        });
+      });
+      return;
+    }
     if (data.total > 0 && data.on > 0) {
       const config = DOMAIN_CONFIG[domain];
       if (config) {
