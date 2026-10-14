@@ -25,6 +25,8 @@ export interface DomainCount {
   /** For covers: the chip the cover is counted in. */
   statusKind?: CoverStatusKind;
   entities?: string[]; // de 'aan'-entiteiten van dit domein
+  /** Set by applyStatusUrgency(): shown in red and sorted first. */
+  urgent?: boolean;
 }
 
 // Constants for state checks

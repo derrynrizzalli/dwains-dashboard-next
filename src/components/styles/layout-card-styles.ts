@@ -1357,9 +1357,16 @@ export const layoutCardStyles = css`
       font-weight: 500;
     }
 
+    /* Armed is a calm, locked state: lock blue, not red. */
     .welcome-alarm.alarm-armed {
-      background: var(--error-color);
-      color: var(--text-primary-color);
+      background: #2f6fd6;
+      color: #ffffff;
+    }
+
+    /* Arming, pending or unknown. */
+    .welcome-alarm.alarm-pending {
+      background: var(--secondary-background-color);
+      color: var(--primary-text-color);
     }
 
     .welcome-alarm.alarm-disarmed {
@@ -5181,6 +5188,17 @@ export const layoutCardStyles = css`
 
     .home-status-card:hover::before {
       opacity: 0.85;
+    }
+
+    /* Urgent status: safety sensors, the alarm and, while the alarm is
+       triggered, openings and motion. --status-color is red then. */
+    .home-status-card.urgent,
+    .status-card-compact.urgent {
+      border-color: color-mix(in srgb, var(--status-color) 55%, transparent);
+    }
+
+    .home-status-card.urgent::before {
+      opacity: 1;
     }
 
     .home-status-card .status-card-icon {

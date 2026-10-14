@@ -25,6 +25,7 @@ import {
 } from '../utils/state-relevance';
 import { getAreaIcon, getDeviceClassIcon, getDomainColor, getDomainIcon } from '../utils/icons';
 import { getStatusDomains, type DomainCount as StatusDomainCount } from '../utils/header-status-domains';
+import { applyStatusUrgency, statusColor } from '../utils/status-urgency';
 import { getDeviceClassName, getDomainName } from '../utils/domain-names';
 import { filterHiddenDeviceEntities } from '../utils/device-admission';
 import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
@@ -1324,25 +1325,29 @@ export class DwainsLayoutCard extends LitElement {
     return true;
   }
 
-  /** Entities of the selected area plus its temperature and humidity sensors. */
+  /** Entities of the selected area, its temperature and humidity sensors and the alarm. */
   private _areaRelevantEntityIds(areaId: string): ReadonlySet<string> {
     const area = getAreaConfigMap(this.config).get(areaId);
     const areaRegistry = this.hass?.areas?.[areaId] as any;
     return this._areaRelevantEntityIdSet(
       this._getAreaEntities(areaId),
       areaRegistry?.temperature_entity_id || area?.temperature_entity_id || '',
-      areaRegistry?.humidity_entity_id || area?.humidity_entity_id || ''
+      areaRegistry?.humidity_entity_id || area?.humidity_entity_id || '',
+      this.config.settings?.alarm_entity_id || ''
     );
   }
 
   private _areaRelevantEntityIdSet = memoizeOne((
     entities: EntityConfig[],
     temperatureEntityId: string,
-    humidityEntityId: string
+    humidityEntityId: string,
+    alarmEntityId: string
   ): ReadonlySet<string> => {
     const ids = new Set(entities.map(entity => entity.entity_id));
     if (temperatureEntityId) ids.add(temperatureEntityId);
     if (humidityEntityId) ids.add(humidityEntityId);
+    // A triggered alarm turns the header chips and sidebar badges red.
+    if (alarmEntityId) ids.add(alarmEntityId);
     return ids;
   });
 
@@ -2000,8 +2005,8 @@ export class DwainsLayoutCard extends LitElement {
               d => `${d.domain}-${d.statusKind || d.deviceClass || d.name}`,
               domain => html`
                 <div
-                  class="status-card-compact ${domain.domain} ${domain.value ? 'has-value' : ''} header-card"
-                  style=${this._domainStatusStyle(domain.domain, domain.deviceClass)}
+                  class="status-card-compact ${domain.domain} ${domain.value ? 'has-value' : ''} ${domain.urgent ? 'urgent' : ''} header-card"
+                  style=${this._statusChipStyle(domain)}
                   role="button"
                   tabindex="0"
                   @click=${() => this._handleStatusCardClick(domain)}
@@ -2118,8 +2123,8 @@ export class DwainsLayoutCard extends LitElement {
     `;
   }
 
-  private _domainStatusStyle(domain: string, deviceClass?: string): string {
-    return `--status-color: ${getDomainColor(domain, deviceClass)};`;
+  private _statusChipStyle(domain: DomainCount): string {
+    return `--status-color: ${statusColor(domain, Boolean(domain.urgent))};`;
   }
 
   private _domainBadgeStyle(domain: string, deviceClass?: string): string {
@@ -2626,8 +2631,8 @@ export class DwainsLayoutCard extends LitElement {
       this._homeInformationCardVisible('power') ? this._renderHousePowerStatusCard() : nothing,
       ...visibleDomains.map(domain => html`
         <div
-          class="home-status-card ${domain.domain} ${domain.value ? 'has-value' : ''}"
-          style=${this._domainStatusStyle(domain.domain, domain.deviceClass)}
+          class="home-status-card ${domain.domain} ${domain.value ? 'has-value' : ''} ${domain.urgent ? 'urgent' : ''}"
+          style=${this._statusChipStyle(domain)}
           role="button"
           tabindex="0"
           @click=${() => this._handleStatusCardClick(domain)}
@@ -3399,26 +3404,32 @@ export class DwainsLayoutCard extends LitElement {
     const alarm = this._getAlarmEntity();
     if (!alarm) return nothing;
 
+    // Triggered is red and pulses, armed is blue, disarmed green and every
+    // state in between (arming, pending, unknown) neutral.
     const state = alarm?.state || '';
-    const isArmed = ['armed_away', 'armed_home', 'armed_night', 'armed_vacation'].includes(state);
+    const isTriggered = state === 'triggered';
+    const isArmed = state.startsWith('armed_');
     const isDisarmed = state === 'disarmed';
 
     const getAlarmIcon = () => {
+      if (isTriggered) return 'mdi:shield-alert';
       if (isArmed) return 'mdi:shield-check';
       if (isDisarmed) return 'mdi:shield-off';
-      return 'mdi:shield-alert';
+      return 'mdi:shield-outline';
     };
 
     const getAlarmText = () => {
       if (isArmed) return this._t('home.alarm_armed');
       if (isDisarmed) return this._t('home.alarm_disarmed');
-      return this._t('domain.alarm_control_panel');
+      // Home Assistant's own name for the state, like Triggered or Arming.
+      return (state && this.hass.formatEntityState?.(alarm)) || this._t('domain.alarm_control_panel');
     };
 
     const getAlarmClass = () => {
+      if (isTriggered) return 'alarm-triggered';
       if (isArmed) return 'alarm-armed';
       if (isDisarmed) return 'alarm-disarmed';
-      return 'alarm-triggered';
+      return 'alarm-pending';
     };
 
     return html`
@@ -6205,12 +6216,21 @@ export class DwainsLayoutCard extends LitElement {
     return undefined;
   }
 
-  private _getStatusDomains(): DomainCount[] {
-    return this._statusDomains(this.hass, this.config);
+  /** The configured alarm reports `triggered`: openings and motion become urgent. */
+  private _isAlarmTriggered(): boolean {
+    return this._getAlarmEntity()?.state === 'triggered';
   }
 
-  // Computed once per hass object and config.
-  private _statusDomains = memoizeOne((hass: HomeAssistant, config: DwainsDashboardConfig): DomainCount[] => {
+  private _getStatusDomains(): DomainCount[] {
+    return this._statusDomains(this.hass, this.config, this._isAlarmTriggered());
+  }
+
+  // Computed once per hass object, config and alarm state.
+  private _statusDomains = memoizeOne((
+    hass: HomeAssistant,
+    config: DwainsDashboardConfig,
+    alarmTriggered: boolean
+  ): DomainCount[] => {
     const result = getStatusDomains(hass, config);
 
     // Add wattage badge if available (same as getTotalWattage()).
@@ -6226,7 +6246,9 @@ export class DwainsLayoutCard extends LitElement {
       });
     }
 
-    return result;
+    // Urgent chips (alarm, safety sensors, openings while the alarm is
+    // triggered) come first.
+    return applyStatusUrgency(result, alarmTriggered);
   });
 
   private _housePowerUsage = memoizeOne(
