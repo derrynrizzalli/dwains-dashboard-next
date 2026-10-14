@@ -25,6 +25,14 @@ Common groups include:
 
 The visible groups can be changed in Dashboard settings, Devices page. The same page can hide single entities from the Devices page only, without hiding them in the rooms.
 
+Inside a group the entities are listed per room, with the icon of each room. Lights, switches, fans, covers and locks get an action per room in the room heading:
+
+- Lights, switches and fans: a switch that shows how many are on, for example **2/5**, when the room has more than one. It switches everything in the room off, or on when everything is off.
+- Covers: open and close all covers of the room.
+- Locks: lock and unlock all locks of the room. Unlocking always asks for confirmation.
+
+The other room actions ask first when the master action confirmations in Dashboard settings are on for that type.
+
 ## Hidden And Unavailable Entities
 
 Entities without an area are not shown in Dwains Dashboard. Unavailable entities are hidden by default and can be enabled in Dashboard settings.

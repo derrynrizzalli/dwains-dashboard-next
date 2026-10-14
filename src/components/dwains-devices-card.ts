@@ -13,7 +13,7 @@ import { isHiddenAsUnavailable } from '../utils/entity-availability';
 import { getDevicesPageHiddenEntityIdSet, isConfigEntityInArea } from '../utils/entity-lookups';
 import { updateStoredDashboardStrategy } from '../utils/dashboard-config-store';
 import { isNonAdminUser } from '../utils/security';
-import { getDomainIcon, getDeviceClassIcon, getDomainColor } from '../utils/icons';
+import { getAreaIcon, getDomainIcon, getDeviceClassIcon, getDomainColor } from '../utils/icons';
 import { getDomainName, getDeviceClassName } from '../utils/domain-names';
 import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
 import { areaEntityDisplayName } from '../utils/entity-names';
@@ -38,6 +38,18 @@ import './utils/dd-card-host';
 import { sharedHousePowerUsage } from './ui/dd-house-power-panel';
 import { getEntityRegistry } from '../utils/entity-registry';
 import { pageHeaderStyles } from './styles/page-header-styles';
+import { roomActionStyles } from './styles/room-action-styles';
+import { showConfirmDialog } from './utils/confirm-dialog';
+import { masterActionConfirmationEnabled } from '../utils/master-action-confirmations';
+import {
+  countActiveEntities,
+  getRoomAction,
+  hasRoomAction,
+  isDestructiveBulkAction,
+  isRoomActionEntityActive,
+  roomActionNeedsConfirmation,
+  type BulkDomainAction,
+} from '../utils/home-information';
 
 const NEW_DEVICES_KEY = '__new_devices__';
 const MAINTENANCE_KEY = '__maintenance__';
@@ -1163,11 +1175,12 @@ export class DwainsDevicesCard extends LitElement {
           const bucket = byArea.get(area.area_id)!;
           return html`
             <div class="domain-group">
-              <div class="domain-header">
+              <div class="domain-header" style=${`--room-accent: ${this._typeColor(domain)};`}>
                 <div class="domain-header-title">
-                  <ha-icon icon="mdi:floor-plan"></ha-icon>
+                  <ha-icon icon=${getAreaIcon(area)}></ha-icon>
                   <span>${area.name}</span>
                 </div>
+                ${this._renderRoomAction(area, domain, bucket.entities)}
               </div>
               <div class=${this._entitiesGridClass(domain)}>
                 ${repeat(
@@ -1181,6 +1194,87 @@ export class DwainsDevicesCard extends LitElement {
         })}
       </div>
     `;
+  }
+
+  /**
+   * The action of one room on a device page: an "active/total" switch for
+   * lights, switches and fans (when the room has more than one), open/close
+   * for covers and lock/unlock for locks.
+   */
+  private _renderRoomAction(area: AreaConfig, domain: string, entities: EntityConfig[]) {
+    if (!hasRoomAction(domain)) return nothing;
+    const entityIds = entities.map((entity) => entity.entity_id).filter((entityId) => this._hass.states[entityId]);
+    const activeCount = countActiveEntities(entityIds, (entityId) =>
+      isRoomActionEntityActive(this._hass.states[entityId], domain)
+    );
+    const action = getRoomAction(domain, activeCount, entityIds.length);
+    if (!action) return nothing;
+
+    if (action.mode === 'toggle') {
+      const label = this._t(action.action === 'turn_off' ? 'action.turn_off_all' : 'action.turn_on_all');
+      return html`
+        <button
+          class="room-toggle ${action.checked ? 'is-on' : ''}"
+          type="button"
+          role="switch"
+          aria-checked=${action.checked ? 'true' : 'false'}
+          aria-label=${`${area.name}: ${this._t('area_header.on_count', { active: action.activeCount, total: action.totalCount })}`}
+          title=${label}
+          @click=${() => void this._runRoomAction(area, domain, entityIds, action.action, label)}
+        >
+          <span aria-hidden="true">${action.activeCount}/${action.totalCount}</span>
+          <span class="room-toggle-track" aria-hidden="true"></span>
+        </button>
+      `;
+    }
+
+    return html`
+      <div class="room-segmented" role="group" aria-label=${area.name}>
+        ${action.items.map((item) => {
+          const label = this._t(item.labelKey);
+          return html`
+            <button
+              class="room-segment ${item.current ? 'is-current' : ''}"
+              type="button"
+              title=${label}
+              aria-label=${this._t('action.entity_action', { action: label, name: area.name })}
+              @click=${() => void this._runRoomAction(area, domain, entityIds, item.action, label)}
+            >
+              <ha-icon icon=${item.icon} aria-hidden="true"></ha-icon>
+            </button>
+          `;
+        })}
+      </div>
+    `;
+  }
+
+  /** Unlocking always asks first; the rest follows the master action confirmations. */
+  private async _runRoomAction(
+    area: AreaConfig,
+    domain: string,
+    entityIds: string[],
+    action: BulkDomainAction,
+    label: string
+  ): Promise<void> {
+    if (!entityIds.length) return;
+    const confirmationEnabled = masterActionConfirmationEnabled(this.config?.settings, domain);
+    if (roomActionNeedsConfirmation(action, confirmationEnabled)) {
+      const confirmed = await showConfirmDialog(this, {
+        hass: this._hass,
+        title: label,
+        message: this._t('action.confirm_master_action', { count: entityIds.length, area: area.name }),
+        confirmLabel: label,
+        destructive: isDestructiveBulkAction(action),
+      });
+      if (!confirmed) return;
+    }
+
+    try {
+      await this._hass.callService(domain, action, { entity_id: entityIds });
+    } catch (err) {
+      console.warn(`Failed to run ${action} for ${domain}:`, err);
+      fireEvent(this, 'hass-notification', { message: this._t('entity.group_failed') });
+    }
   }
 
   private _renderEnergyView() {
@@ -1695,8 +1789,7 @@ export class DwainsDevicesCard extends LitElement {
       }
 
       .domain-header {
-        align-items: flex-start;
-        flex-direction: column;
+        flex-wrap: wrap;
       }
     }
 
@@ -2542,7 +2635,7 @@ export class DwainsDevicesCard extends LitElement {
       }
 
     }
-  `, pageHeaderStyles];
+  `, pageHeaderStyles, roomActionStyles];
 }
 
 declare global {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasRoomAction,
+  isRoomActionEntityActive,
   countActiveEntities,
   getRoomAction,
   isCompactRoom,
@@ -146,5 +148,27 @@ describe('statistics entities', () => {
     expect(powerSharePercentage(50, 100)).toBe(50);
     expect(powerSharePercentage(1, 1000)).toBe(4);
     expect(powerSharePercentage(10, 0)).toBe(0);
+  });
+});
+
+describe('room actions on the Devices page', () => {
+  it('only offers actions for switches, covers and locks', () => {
+    expect(['light', 'switch', 'fan', 'input_boolean', 'cover', 'lock'].every(hasRoomAction)).toBe(true);
+    expect(['sensor', 'binary_sensor.motion', 'climate', 'media_player', 'person'].some(hasRoomAction)).toBe(false);
+  });
+
+  it('counts on, open and unlocked entities', () => {
+    expect(isRoomActionEntityActive({ state: 'on' }, 'light')).toBe(true);
+    expect(isRoomActionEntityActive({ state: 'off' }, 'switch')).toBe(false);
+    expect(isRoomActionEntityActive({ state: 'opening' }, 'cover')).toBe(true);
+    expect(isRoomActionEntityActive({ state: 'closed' }, 'cover')).toBe(false);
+    expect(isRoomActionEntityActive({ state: 'unlocked' }, 'lock')).toBe(true);
+    expect(isRoomActionEntityActive({ state: 'locked' }, 'lock')).toBe(false);
+  });
+
+  it('never counts unavailable, unknown or missing entities', () => {
+    expect(isRoomActionEntityActive({ state: 'unavailable' }, 'light')).toBe(false);
+    expect(isRoomActionEntityActive({ state: 'unknown' }, 'cover')).toBe(false);
+    expect(isRoomActionEntityActive(undefined, 'lock')).toBe(false);
   });
 });

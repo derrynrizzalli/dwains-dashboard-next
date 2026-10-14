@@ -41,6 +41,7 @@ import {
 } from '../utils/sheet-drag-controller';
 import { dialogSheetStyles } from './styles/dialog-sheet-styles';
 import { homeInformationDialogStyles } from './styles/home-information-dialog-styles';
+import { roomActionStyles } from './styles/room-action-styles';
 
 export interface DomainEntitiesDialogParams {
   domain: string;
@@ -544,7 +545,7 @@ export class DwainsDomainEntitiesDialog extends LitElement {
         min-height: 126px;
       }
     }
-  `, homeInformationDialogStyles];
+  `, homeInformationDialogStyles, roomActionStyles];
 
   public async showDialog(params: DomainEntitiesDialogParams): Promise<void> {
     this._params = params;

@@ -107,6 +107,26 @@ export function getRoomAction(domain: string, activeCount: number, totalCount: n
   return undefined;
 }
 
+/** Domains that get a room action: switches, covers and locks. */
+export function hasRoomAction(domain: string): boolean {
+  return TOGGLE_DOMAINS.has(domain) || domain === 'cover' || domain === 'lock';
+}
+
+/**
+ * Whether an entity counts as on, open or unlocked for a room action.
+ * Unavailable and unknown entities never count.
+ */
+export function isRoomActionEntityActive(
+  state: { state?: string | null } | null | undefined,
+  domain: string
+): boolean {
+  const value = String(state?.state ?? '').toLowerCase();
+  if (!value || value === 'unavailable' || value === 'unknown') return false;
+  if (domain === 'cover') return value === 'open' || value === 'opening';
+  if (domain === 'lock') return value === 'unlocked' || value === 'unlocking' || value === 'open';
+  return value === 'on';
+}
+
 /**
  * Whether a room action asks first. Unlocking always asks; everything else
  * follows the master action confirmation setting of the domain.
