@@ -13,10 +13,12 @@ import {
   getAreaEntityGroupKey,
   getAreaGroupedEntities,
   getAreaGroupedEntitiesFromConfig,
+  groupAreaCovers,
   legacyAreaGroupKeys,
   migrateAreaCardPlacement,
   resolveAreaGroupEntityOrder,
   resolveAreaSortMode,
+  selectAreaCovers,
   sortAreas,
   stripAreaFromEntityName,
 } from '../src/utils/area-entities';
@@ -417,5 +419,47 @@ describe('room group compatibility with older configs', () => {
     expect(migrateAreaCardPlacement('domain:constructor:0')).toBe('domain:constructor:0');
     expect(migrateAreaCardPlacement('ungrouped:3')).toBe('ungrouped:3');
     expect(migrateAreaCardPlacement('bottom')).toBe('bottom');
+  });
+});
+
+describe('area cover groups', () => {
+  const states = [
+    entityState('cover.blind', 'open', { device_class: 'blind' }),
+    entityState('cover.awning', 'closed', { device_class: 'awning' }),
+    entityState('cover.plain', 'closed'),
+    entityState('cover.front_door', 'closed', { device_class: 'door' }),
+    entityState('cover.garage', 'open', { device_class: 'garage' }),
+    entityState('binary_sensor.window', 'on', { device_class: 'window' }),
+    entityState('light.ceiling', 'on'),
+  ];
+  const hass = hassWithStates(states);
+  const entities = states.map((state) => ({ entity_id: state.entity_id }));
+  const ids = (list: { entity_id: string }[]) => list.map((entity) => entity.entity_id);
+
+  it('sorts only covers into their groups', () => {
+    const groups = groupAreaCovers(entities, hass.states);
+    expect(ids(groups.cover_shading)).toEqual(['cover.blind', 'cover.awning', 'cover.plain']);
+    expect(ids(groups.cover_openings)).toEqual(['cover.front_door']);
+    expect(ids(groups.cover_gates)).toEqual(['cover.garage']);
+  });
+
+  it('selects the covers an open or close action for a group acts on', () => {
+    expect(ids(selectAreaCovers(entities, hass.states, 'cover_gates'))).toEqual(['cover.garage']);
+    expect(ids(selectAreaCovers(entities, hass.states, 'cover_openings'))).toEqual(['cover.front_door']);
+    expect(ids(selectAreaCovers(entities, hass.states, 'cover_shading'))).toEqual(['cover.blind', 'cover.awning', 'cover.plain']);
+  });
+
+  it('selects every cover without a group', () => {
+    expect(ids(selectAreaCovers(entities, hass.states))).toEqual([
+      'cover.blind',
+      'cover.awning',
+      'cover.plain',
+      'cover.front_door',
+      'cover.garage',
+    ]);
+  });
+
+  it('treats covers without a state as shading', () => {
+    expect(ids(selectAreaCovers([{ entity_id: 'cover.gone' }], {}, 'cover_shading'))).toEqual(['cover.gone']);
   });
 });

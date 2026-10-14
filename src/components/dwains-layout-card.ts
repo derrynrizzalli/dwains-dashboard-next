@@ -32,10 +32,14 @@ import {
   areaEntityDeviceLabel,
   areaGroupOrderIndex,
   getAreaEntityGroupKey,
+  groupAreaCovers,
   migrateAreaCardPlacement,
   resolveAreaGroupEntityOrder,
+  selectAreaCovers,
   sortAreas,
   stripAreaFromEntityName,
+  AREA_COVER_GROUPS,
+  type AreaCoverGroup,
 } from '../utils/area-entities';
 import { navigateHomeAssistant } from '../utils/navigation';
 import { syncHassDarkThemeAttribute } from '../utils/theme';
@@ -4484,14 +4488,23 @@ export class DwainsLayoutCard extends LitElement {
     return active ? this._t('area_header.on_count', { active, total }) : this._t('common.off');
   }
 
+  /** Closed is the resting state of every cover group; the icon shows when something is open. */
+  private _areaCoverTileIcon(groupKey: AreaCoverGroup, isOpen: boolean): string {
+    if (groupKey === 'cover_openings') return isOpen ? 'mdi:door-open' : 'mdi:door-closed';
+    if (groupKey === 'cover_gates') return isOpen ? 'mdi:gate-open' : 'mdi:gate';
+    return isOpen ? 'mdi:blinds-horizontal' : 'mdi:blinds-horizontal-closed';
+  }
+
   private _renderAreaQuickTiles(areaId: string, entities: EntityConfig[]) {
     const lights = entities.filter(e => e.entity_id.startsWith('light.'));
     const switches = entities.filter(e => e.entity_id.startsWith('switch.'));
-    const covers = entities.filter(e => e.entity_id.startsWith('cover.'));
+    // One tile per cover group, for example blinds apart from the garage door.
+    const coverGroups = groupAreaCovers(entities, this.hass.states);
+    const hasCovers = AREA_COVER_GROUPS.some(groupKey => coverGroups[groupKey].length > 0);
     const fans = entities.filter(e => e.entity_id.startsWith('fan.'));
     const climates = entities.filter(e => e.entity_id.startsWith('climate.'));
 
-    if (!lights.length && !switches.length && !covers.length && !fans.length && !climates.length) {
+    if (!lights.length && !switches.length && !hasCovers && !fans.length && !climates.length) {
       return nothing;
     }
 
@@ -4528,7 +4541,47 @@ export class DwainsLayoutCard extends LitElement {
       `;
     };
 
-    const openCovers = this._countActiveEntities(covers, 'cover');
+    const coverTile = (groupKey: AreaCoverGroup, covers: EntityConfig[]) => {
+      if (!covers.length) return nothing;
+      const openCovers = this._countActiveEntities(covers, 'cover');
+      const isOpen = openCovers > 0;
+      const label = this._mobileGroupName(groupKey);
+      const state = this._areaTileState(openCovers, covers.length, 'open');
+      const openLabel = this._t('action.entity_action', { action: this._t('action.open_all'), name: label });
+      const closeLabel = this._t('action.entity_action', { action: this._t('action.close_all'), name: label });
+      return html`
+        <div class="dd-room-tile cover ${groupKey} has-actions ${isOpen ? 'is-on' : ''}">
+          <span class="dd-room-tile-icon">
+            <ha-icon icon=${this._areaCoverTileIcon(groupKey, isOpen)}></ha-icon>
+          </span>
+          <span class="dd-room-tile-copy">
+            <span class="dd-room-tile-label">${label}</span>
+            <span class="dd-room-tile-state">${state}</span>
+          </span>
+          <span class="dd-room-tile-actions">
+            <button
+              class="dd-room-tile-action"
+              type="button"
+              title=${openLabel}
+              aria-label=${openLabel}
+              @click=${() => void this._setAreaCoverState(areaId, true, groupKey)}
+            >
+              <ha-icon icon="mdi:arrow-up"></ha-icon>
+            </button>
+            <button
+              class="dd-room-tile-action"
+              type="button"
+              title=${closeLabel}
+              aria-label=${closeLabel}
+              @click=${() => void this._setAreaCoverState(areaId, false, groupKey)}
+            >
+              <ha-icon icon="mdi:arrow-down"></ha-icon>
+            </button>
+          </span>
+        </div>
+      `;
+    };
+
     const activeClimates = this._countActiveEntities(climates, 'climate');
     const singleClimateState = climates.length === 1 ? this.hass.states[climates[0]!.entity_id] : undefined;
     const currentTemperature = singleClimateState?.attributes?.current_temperature;
@@ -4555,37 +4608,7 @@ export class DwainsLayoutCard extends LitElement {
           ['action.switches_on_summary', 'action.switches_off_summary'],
           () => this._toggleAreaSwitches(areaId)
         ) : nothing}
-        ${covers.length ? html`
-          <div class="dd-room-tile cover has-actions ${openCovers > 0 ? 'is-on' : ''}">
-            <span class="dd-room-tile-icon">
-              <ha-icon icon=${openCovers > 0 ? 'mdi:window-shutter-open' : 'mdi:window-shutter'}></ha-icon>
-            </span>
-            <span class="dd-room-tile-copy">
-              <span class="dd-room-tile-label">${this._t('domain.cover')}</span>
-              <span class="dd-room-tile-state">${this._areaTileState(openCovers, covers.length, 'open')}</span>
-            </span>
-            <span class="dd-room-tile-actions">
-              <button
-                class="dd-room-tile-action"
-                type="button"
-                title=${this._t('action.open_all')}
-                aria-label=${this._t('action.open_all')}
-                @click=${() => void this._setAreaCoverState(areaId, true)}
-              >
-                <ha-icon icon="mdi:arrow-up"></ha-icon>
-              </button>
-              <button
-                class="dd-room-tile-action"
-                type="button"
-                title=${this._t('action.close_all')}
-                aria-label=${this._t('action.close_all')}
-                @click=${() => void this._setAreaCoverState(areaId, false)}
-              >
-                <ha-icon icon="mdi:arrow-down"></ha-icon>
-              </button>
-            </span>
-          </div>
-        ` : nothing}
+        ${AREA_COVER_GROUPS.map(groupKey => coverTile(groupKey, coverGroups[groupKey]))}
         ${fans.length ? toggleTile(
           'fan',
           fans.length,
@@ -7256,9 +7279,10 @@ export class DwainsLayoutCard extends LitElement {
     }
   }
 
-  private async _setAreaCoverState(areaId: string, open: boolean) {
+  /** Open or close the covers of an area, or only those of one cover group. */
+  private async _setAreaCoverState(areaId: string, open: boolean, groupKey?: AreaCoverGroup) {
     const entities = this._getFilteredAreaEntities(areaId);
-    const covers = entities.filter(e => e.entity_id.startsWith('cover.'));
+    const covers = selectAreaCovers(entities, this.hass.states, groupKey);
     if (covers.length === 0) return;
 
     const confirmed = await this._confirmMasterActionIfNeeded('cover', open, covers.length, areaId);
