@@ -6,6 +6,7 @@ import {
   canTogglePlayback,
   getNowPlayingArtworkUrl,
   getNowPlayingLabels,
+  isAreaNowPlayingEnabled,
   isNowPlayingCandidate,
   isNowPlayingPlayerVisible,
   isNowPlayingRelevantStateChange,
@@ -39,12 +40,29 @@ describe('now playing mode', () => {
     expect(normalizeNowPlayingMode('all')).toBe('all');
   });
 
-  it('shows the bar on the views of the chosen mode', () => {
-    expect(isNowPlayingShownOn('home', 'home')).toBe(true);
-    expect(isNowPlayingShownOn('home', 'area')).toBe(false);
-    expect(isNowPlayingShownOn('all', 'area')).toBe(true);
-    expect(isNowPlayingShownOn('all', 'settings')).toBe(false);
-    expect(isNowPlayingShownOn('off', 'home')).toBe(false);
+  it('shows the bar on the views of the older mode setting', () => {
+    expect(isNowPlayingShownOn({ now_playing_bar: 'home' }, 'home')).toBe(true);
+    expect(isNowPlayingShownOn({ now_playing_bar: 'home' }, 'area')).toBe(false);
+    expect(isNowPlayingShownOn({ now_playing_bar: 'all' }, 'area')).toBe(true);
+    expect(isNowPlayingShownOn({ now_playing_bar: 'all' }, 'settings')).toBe(false);
+    expect(isNowPlayingShownOn({ now_playing_bar: 'off' }, 'home')).toBe(false);
+    expect(isNowPlayingShownOn({ now_playing_bar: 'off' }, 'area')).toBe(false);
+    expect(isNowPlayingShownOn(undefined, 'home')).toBe(true);
+    expect(isNowPlayingShownOn(undefined, 'area')).toBe(false);
+  });
+
+  it('shows the bar on Home when the Home section is visible', () => {
+    expect(isNowPlayingShownOn({ home_sections_hidden: ['now_playing'] }, 'home')).toBe(false);
+    expect(isNowPlayingShownOn({ now_playing_bar: 'off', home_sections_hidden: [], home_sections_order: ['now_playing'] }, 'home')).toBe(true);
+  });
+
+  it('shows the bar on the room pages with their own switch', () => {
+    expect(isAreaNowPlayingEnabled({ show_area_now_playing: true })).toBe(true);
+    expect(isAreaNowPlayingEnabled({ show_area_now_playing: true, now_playing_bar: 'off' })).toBe(true);
+    expect(isAreaNowPlayingEnabled({ show_area_now_playing: false, now_playing_bar: 'all' })).toBe(false);
+    expect(isAreaNowPlayingEnabled({ now_playing_bar: 'all' })).toBe(true);
+    expect(isAreaNowPlayingEnabled({})).toBe(false);
+    expect(isNowPlayingShownOn({ show_area_now_playing: true, home_sections_hidden: ['now_playing'] }, 'area')).toBe(true);
   });
 });
 

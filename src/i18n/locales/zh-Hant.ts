@@ -798,5 +798,9 @@ export const zhHant = {
   'settings.show_alarm': "在首頁顯示警報標籤",
   'settings.show_alarm_description': "關閉後會隱藏警報標籤，但不會移除已選擇的警報。",
   'settings.alarm_hidden': "警報已隱藏",
+  'home_section.now_playing.label': "正在播放",
+  'home_section.now_playing.description': "顯示媒體播放器正在播放的內容，並提供播放/暫停和下一首。在手機上，它會浮動在導覽列上方。",
+  'settings.show_area_now_playing': "在房間頁面顯示正在播放",
+  'settings.show_area_now_playing_description': "在房間標頭下方顯示正在播放列，包含所有房間的播放器。首頁上的區段可在首頁設定中開啟或關閉。",
 
 } as const satisfies TranslationDictionary;

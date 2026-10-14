@@ -37,7 +37,7 @@ import { persistableConfig } from "../utils/dashboard-config";
 import { isHiddenAsUnavailable } from "../utils/entity-availability";
 import { areaEntityDisplayName, hidesAreaNameInEntityNames } from "../utils/entity-names";
 import { isConfigEntityInArea, resolveStatusEntityAreaId } from "../utils/entity-lookups";
-import { normalizeNowPlayingMode, type NowPlayingMode } from "../utils/now-playing";
+import { isAreaNowPlayingEnabled } from "../utils/now-playing";
 import { getDeviceClassName, getDomainName } from "../utils/domain-names";
 import { getDeviceClassIcon, getDomainColor, getDomainIcon } from "../utils/icons";
 import { ddLocale, ddLocalize, ddLocalizePlural } from "../utils/localize";
@@ -48,6 +48,7 @@ import {
   normalizeHiddenHomeInformationCards,
   normalizeHiddenHomeSections,
   normalizeHomeSectionsOrder,
+  resolveHiddenHomeSections,
 } from "../utils/home-sections";
 import {
   addHomeScene,
@@ -831,7 +832,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
           ${this._renderNotificationSettingsPanel()}
           ${this._renderWeatherSettingsPanel()}
           ${this._renderAlarmSettingsPanel()}
-          ${this._renderNowPlayingSettingsPanel()}
         `;
       case "controls":
         return this._renderMasterActionConfirmationSettingsPanel();
@@ -1168,42 +1168,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     );
   }
 
-  private _renderNowPlayingSettingsPanel() {
-    const mode = normalizeNowPlayingMode(this._config?.settings?.now_playing_bar);
-    const modes: Array<{ value: NowPlayingMode; icon: string }> = [
-      { value: 'off', icon: 'mdi:music-off' },
-      { value: 'home', icon: 'mdi:home-outline' },
-      { value: 'all', icon: 'mdi:view-dashboard-outline' },
-    ];
-
-    return this._renderSettingsPanel(
-      "mdi:music-circle-outline",
-      this._t('now_playing.setting_title'),
-      this._t('now_playing.setting_description'),
-      html`
-        <div class="now-playing-settings">
-          <div class="area-order-modes" role="radiogroup" aria-label=${this._t('now_playing.setting_title')}>
-            ${modes.map(({ value, icon }) => html`
-              <button
-                type="button"
-                class="area-order-mode ${mode === value ? 'selected' : ''}"
-                role="radio"
-                aria-checked=${mode === value ? 'true' : 'false'}
-                @click=${() => this._setNowPlayingMode(value)}
-              >
-                <ha-icon .icon=${icon}></ha-icon>
-                <span>
-                  <strong>${this._t(`now_playing.mode_${value}`)}</strong>
-                  <small>${this._t(`now_playing.mode_${value}_description`)}</small>
-                </span>
-              </button>
-            `)}
-          </div>
-        </div>
-      `
-    );
-  }
-
   private _renderWeatherSettingsPanel() {
     return this._renderSettingsPanel(
       "mdi:weather-cloudy",
@@ -1387,6 +1351,15 @@ export class DwainsDashboardStrategyEditor extends LitElement {
               ></ha-switch>
             </ha-formfield>
             <p class="toggle-description">${this._t('thermostat.setting_description')}</p>
+          </div>
+          <div class="hide-unavailable-toggle">
+            <ha-formfield .label=${this._t('settings.show_area_now_playing')}>
+              <ha-switch
+                .checked=${isAreaNowPlayingEnabled(this._config?.settings)}
+                @change=${this._toggleAreaNowPlaying}
+              ></ha-switch>
+            </ha-formfield>
+            <p class="toggle-description">${this._t('settings.show_area_now_playing_description')}</p>
           </div>
           ${this._renderAreasConfiguration()}
         </div>
@@ -1987,7 +1960,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   }
 
   private _getHiddenHomeSections(): Set<HomeSectionKey> {
-    return new Set(normalizeHiddenHomeSections(this._config?.settings?.home_sections_hidden));
+    return new Set(resolveHiddenHomeSections(this._config?.settings));
   }
 
   private _getHiddenHomeInformationCards(): Set<HomeInformationCardKey> {
@@ -2087,11 +2060,14 @@ export class DwainsDashboardStrategyEditor extends LitElement {
   private _setHomeSectionsOrder(order: HomeSectionKey[]): void {
     if (!this._config) return;
 
+    // Order and hidden list are saved together, so sections that older
+    // settings hide (Now playing) stay hidden once they are managed here.
     const newConfig: DwainsDashboardConfig = {
       ...this._config,
       settings: {
         ...this._config.settings,
         home_sections_order: normalizeHomeSectionsOrder(order),
+        home_sections_hidden: [...this._getHiddenHomeSections()],
       },
     };
 
@@ -2112,6 +2088,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       ...this._config,
       settings: {
         ...this._config.settings,
+        home_sections_order: this._getHomeSectionsOrder(),
         home_sections_hidden: normalizeHiddenHomeSections([...hidden]),
       },
     };
@@ -4674,18 +4651,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
-  private _setNowPlayingMode(mode: NowPlayingMode): void {
-    const newConfig: DwainsDashboardConfig = {
-      ...this._config!,
-      settings: {
-        ...this._config!.settings,
-        now_playing_bar: mode
-      }
-    };
-
-    this._fireConfigChanged(newConfig);
-  }
-
   private _toggleHideAreaName = (e: Event): void => {
     if (!this._config) return;
     this._fireConfigChanged({
@@ -4693,6 +4658,17 @@ export class DwainsDashboardStrategyEditor extends LitElement {
       settings: {
         ...this._config.settings,
         hide_area_name_in_entity_names: Boolean((e.target as any).checked),
+      },
+    });
+  };
+
+  private _toggleAreaNowPlaying = (e: Event): void => {
+    if (!this._config) return;
+    this._fireConfigChanged({
+      ...this._config,
+      settings: {
+        ...this._config.settings,
+        show_area_now_playing: Boolean((e.target as any).checked),
       },
     });
   };
@@ -5906,10 +5882,6 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
       .area-order-hint {
         margin: 12px 0 0;
-      }
-
-      .now-playing-settings {
-        padding: 0 16px 16px;
       }
 
       .area-entity-layout-settings {

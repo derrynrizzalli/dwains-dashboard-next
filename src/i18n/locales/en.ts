@@ -821,6 +821,10 @@ export const en = {
   'settings.show_alarm': "Show the alarm chip on the home page",
   'settings.show_alarm_description': "Turn this off to hide the alarm chip without removing the selected alarm.",
   'settings.alarm_hidden': "Alarm hidden",
+  'home_section.now_playing.label': "Now playing",
+  'home_section.now_playing.description': "What is playing on your media players, with play/pause and next track. On phones it floats above the navigation.",
+  'settings.show_area_now_playing': "Show Now playing on room pages",
+  'settings.show_area_now_playing_description': "Shows the Now playing bar below the room header, with the players of every room. Turn the Home section on or off in the Home page settings.",
 
 } as const;
 

@@ -823,5 +823,9 @@ export const ru = {
   'settings.show_alarm': "Показывать индикатор сигнализации на главной странице",
   'settings.show_alarm_description': "Выключите, чтобы скрыть индикатор, не удаляя выбранную сигнализацию.",
   'settings.alarm_hidden': "Сигнализация скрыта",
+  'home_section.now_playing.label': "Сейчас играет",
+  'home_section.now_playing.description': "Что играет на ваших медиаплеерах, с кнопками воспроизведения/паузы и следующего трека. На телефонах панель плавает над навигацией.",
+  'settings.show_area_now_playing': "Показывать «Сейчас играет» на страницах комнат",
+  'settings.show_area_now_playing_description': "Показывает панель «Сейчас играет» под заголовком комнаты с плеерами всех комнат. Раздел на главной странице включается в настройках главной страницы.",
 
 } as const satisfies TranslationDictionary;

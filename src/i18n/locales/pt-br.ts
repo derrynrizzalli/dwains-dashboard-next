@@ -823,4 +823,8 @@ export const ptBR = {
   'settings.show_alarm': "Mostrar o indicador do alarme na página inicial",
   'settings.show_alarm_description': "Desative para ocultar o indicador do alarme sem remover o alarme escolhido.",
   'settings.alarm_hidden': "Alarme oculto",
+  'home_section.now_playing.label': "Tocando agora",
+  'home_section.now_playing.description': "O que está tocando nos seus reprodutores de mídia, com reproduzir/pausar e próxima faixa. No celular a barra flutua acima da navegação.",
+  'settings.show_area_now_playing': "Mostrar Tocando agora nas páginas dos cômodos",
+  'settings.show_area_now_playing_description': "Mostra a barra Tocando agora abaixo do cabeçalho do cômodo, com os reprodutores de todos os cômodos. A seção da página inicial é ligada nas configurações da página inicial.",
 } as const satisfies TranslationDictionary;

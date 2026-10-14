@@ -800,5 +800,9 @@ export const nl = {
   'settings.show_alarm': "Alarmchip tonen op de startpagina",
   'settings.show_alarm_description': "Zet dit uit om de alarmchip te verbergen zonder het gekozen alarm te verwijderen.",
   'settings.alarm_hidden': "Alarm verborgen",
+  'home_section.now_playing.label': "Nu aan het spelen",
+  'home_section.now_playing.description': "Wat er op je mediaspelers speelt, met afspelen/pauzeren en volgend nummer. Op telefoons zweeft de balk boven de navigatie.",
+  'settings.show_area_now_playing': "Nu aan het spelen tonen op kamerpagina's",
+  'settings.show_area_now_playing_description': "Toont de Nu aan het spelen-balk onder de kamerkop, met de spelers van alle kamers. De sectie op Home zet je aan of uit bij de instellingen van de startpagina.",
 
 } as const satisfies TranslationDictionary;

@@ -823,4 +823,8 @@ export const it = {
   'settings.show_alarm': "Mostra l'indicatore dell'allarme nella Home",
   'settings.show_alarm_description': "Disattiva per nascondere l'indicatore senza rimuovere l'allarme scelto.",
   'settings.alarm_hidden': "Allarme nascosto",
+  'home_section.now_playing.label': "In riproduzione",
+  'home_section.now_playing.description': "Cosa è in riproduzione sui tuoi lettori multimediali, con riproduci/pausa e brano successivo. Sui telefoni la barra fluttua sopra la navigazione.",
+  'settings.show_area_now_playing': "Mostra In riproduzione nelle pagine delle stanze",
+  'settings.show_area_now_playing_description': "Mostra la barra In riproduzione sotto l'intestazione della stanza, con i lettori di tutte le stanze. La sezione della Home si attiva nelle impostazioni della pagina iniziale.",
 } as const satisfies TranslationDictionary;

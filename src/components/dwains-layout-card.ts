@@ -32,7 +32,7 @@ import { areaEntityDeviceLabel, sortAreas } from '../utils/area-entities';
 import { areaEntityDisplayName } from '../utils/entity-names';
 import { navigateHomeAssistant } from '../utils/navigation';
 import { syncHassDarkThemeAttribute } from '../utils/theme';
-import { HOME_SECTION_META, normalizeHiddenHomeInformationCards, normalizeHiddenHomeSections, normalizeHomeSectionsOrder } from '../utils/home-sections';
+import { HOME_SECTION_META, normalizeHiddenHomeInformationCards, normalizeHomeSectionsOrder, resolveHiddenHomeSections } from '../utils/home-sections';
 import { buildHousePowerUsage } from '../utils/power-usage';
 import { normalizeHomeScenes, resolveHomeSceneItems, type HomeSceneItem } from '../utils/home-scenes';
 import { formatEntityStateWithUnit, formatValueWithUnit } from '../utils/unit-format';
@@ -63,7 +63,6 @@ import {
   isNowPlayingPlayerVisible,
   isNowPlayingRelevantStateChange,
   isNowPlayingShownOn,
-  normalizeNowPlayingMode,
   nowPlayingRoomName,
   pickNowPlayingEntityIds,
 } from '../utils/now-playing';
@@ -1460,9 +1459,9 @@ export class DwainsLayoutCard extends LitElement {
     `;
   }
 
-  /** Whether the Now playing bar setting includes the current view. */
+  /** Whether the Now playing settings include the current view. */
   private _nowPlayingShown(): boolean {
-    return isNowPlayingShownOn(normalizeNowPlayingMode(this.config?.settings?.now_playing_bar), this._selectedView);
+    return isNowPlayingShownOn(this.config?.settings, this._selectedView);
   }
 
   /** Players for the Now playing bar on the current view, most relevant first. */
@@ -2111,7 +2110,6 @@ export class DwainsLayoutCard extends LitElement {
     return html`
       <div class="home-view">
         ${this._renderHomeWelcome()}
-        ${!this._isMobile ? this._renderNowPlayingBar(false) : nothing}
         ${sections.map(section => this._renderHomeSection(section))}
       </div>
     `;
@@ -2122,7 +2120,7 @@ export class DwainsLayoutCard extends LitElement {
   }
 
   private _getVisibleHomeSections(): HomeSectionKey[] {
-    const hidden = new Set(normalizeHiddenHomeSections(this.config?.settings?.home_sections_hidden));
+    const hidden = new Set(resolveHiddenHomeSections(this.config?.settings));
     const forceAreas = this._isDesktopAreaSidebarCollapsed();
     return this._getHomeSectionsOrder().filter(section => !hidden.has(section) || (forceAreas && section === 'areas'));
   }
@@ -2134,6 +2132,9 @@ export class DwainsLayoutCard extends LitElement {
 
   private _renderHomeSection(section: HomeSectionKey) {
     switch (section) {
+      case 'now_playing':
+        // Phones float the bar above the bottom navigation instead.
+        return !this._isMobile ? this._renderNowPlayingBar(false) : nothing;
       case 'summaries':
         return this._renderHomeSummaries();
       case 'cameras':

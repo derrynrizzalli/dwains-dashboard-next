@@ -798,5 +798,9 @@ export const zhHans = {
   'settings.show_alarm': "在首页显示警报标签",
   'settings.show_alarm_description': "关闭后会隐藏警报标签，但不会移除已选择的警报。",
   'settings.alarm_hidden': "警报已隐藏",
+  'home_section.now_playing.label': "正在播放",
+  'home_section.now_playing.description': "显示媒体播放器正在播放的内容，并提供播放/暂停和下一曲。在手机上，它会悬浮在导航栏上方。",
+  'settings.show_area_now_playing': "在房间页面显示正在播放",
+  'settings.show_area_now_playing_description': "在房间标头下方显示正在播放栏，包含所有房间的播放器。首页上的区段可在首页设置中开启或关闭。",
 
 } as const satisfies TranslationDictionary;

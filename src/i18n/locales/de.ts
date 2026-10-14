@@ -800,5 +800,9 @@ export const de = {
   'settings.show_alarm': "Alarmanzeige auf der Startseite anzeigen",
   'settings.show_alarm_description': "Ausschalten, um die Alarmanzeige auszublenden, ohne den gewählten Alarm zu entfernen.",
   'settings.alarm_hidden': "Alarm ausgeblendet",
+  'home_section.now_playing.label': "Aktuelle Wiedergabe",
+  'home_section.now_playing.description': "Was auf deinen Mediaplayern läuft, mit Wiedergabe/Pause und nächstem Titel. Auf Smartphones schwebt die Leiste über der Navigation.",
+  'settings.show_area_now_playing': "Aktuelle Wiedergabe auf Raumseiten anzeigen",
+  'settings.show_area_now_playing_description': "Zeigt die Leiste Aktuelle Wiedergabe unter der Raum-Kopfzeile, mit den Playern aller Räume. Den Abschnitt auf der Startseite schaltest du in den Einstellungen der Startseite ein oder aus.",
 
 } as const satisfies TranslationDictionary;

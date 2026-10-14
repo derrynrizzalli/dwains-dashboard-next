@@ -1,7 +1,8 @@
-import type { HomeInformationCardKey, HomeSectionKey } from '../types/strategy';
+import type { DwainsDashboardSettings, HomeInformationCardKey, HomeSectionKey } from '../types/strategy';
 import type { TranslationKey } from '../i18n';
 
 export const DEFAULT_HOME_SECTIONS_ORDER: HomeSectionKey[] = [
+  'now_playing',
   'cameras',
   'areas',
   'devices',
@@ -19,6 +20,11 @@ interface LocalizedMeta {
 }
 
 export const HOME_SECTION_META: Record<HomeSectionKey, LocalizedMeta> = {
+  now_playing: {
+    labelKey: 'home_section.now_playing.label',
+    icon: 'mdi:music-circle-outline',
+    descriptionKey: 'home_section.now_playing.description',
+  },
   summaries: {
     labelKey: 'home_section.summaries.label',
     icon: 'mdi:clipboard-list-outline',
@@ -129,6 +135,31 @@ export function normalizeHiddenHomeSections(hidden?: readonly unknown[]): HomeSe
   );
 
   return normalized.filter((section, index, all) => all.indexOf(section) === index);
+}
+
+type HomeSectionSettings = Pick<DwainsDashboardSettings, 'home_sections_order' | 'home_sections_hidden' | 'now_playing_bar'>;
+
+/** Whether the section was ever saved in the stored order or hidden list. */
+export function isHomeSectionManaged(settings: HomeSectionSettings | null | undefined, section: HomeSectionKey): boolean {
+  const stored = [...(settings?.home_sections_order || []), ...(settings?.home_sections_hidden || [])];
+  return stored.includes(section);
+}
+
+/**
+ * Hidden Home sections, including the ones older settings hide: Now playing
+ * used to have its own setting, so while it is not managed as a section it
+ * stays hidden when `now_playing_bar` is 'off'.
+ */
+export function resolveHiddenHomeSections(settings?: HomeSectionSettings | null): HomeSectionKey[] {
+  const hidden = normalizeHiddenHomeSections(settings?.home_sections_hidden);
+  if (
+    !hidden.includes('now_playing') &&
+    !isHomeSectionManaged(settings, 'now_playing') &&
+    settings?.now_playing_bar === 'off'
+  ) {
+    hidden.push('now_playing');
+  }
+  return hidden;
 }
 
 export function normalizeHiddenHomeInformationCards(hidden?: readonly unknown[]): HomeInformationCardKey[] {

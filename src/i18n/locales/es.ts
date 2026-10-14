@@ -800,5 +800,9 @@ export const es = {
   'settings.show_alarm': "Mostrar el chip de alarma en la página de inicio",
   'settings.show_alarm_description': "Desactívalo para ocultar el chip de alarma sin quitar la alarma elegida.",
   'settings.alarm_hidden': "Alarma oculta",
+  'home_section.now_playing.label': "Reproduciendo ahora",
+  'home_section.now_playing.description': "Lo que suena en tus reproductores multimedia, con reproducir/pausar y siguiente pista. En el móvil la barra flota sobre la navegación.",
+  'settings.show_area_now_playing': "Mostrar Reproduciendo ahora en las páginas de habitaciones",
+  'settings.show_area_now_playing_description': "Muestra la barra Reproduciendo ahora bajo el encabezado de la habitación, con los reproductores de todas las habitaciones. La sección de Inicio se activa en los ajustes de la página de inicio.",
 
 } as const satisfies TranslationDictionary;

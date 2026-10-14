@@ -38,7 +38,7 @@ export interface LovelaceCardConfig {
   [key: string]: any;
 }
 
-export type HomeSectionKey = 'summaries' | 'cameras' | 'areas' | 'devices' | 'todos' | 'custom_cards' | 'favorites' | 'scenes';
+export type HomeSectionKey = 'now_playing' | 'summaries' | 'cameras' | 'areas' | 'devices' | 'todos' | 'custom_cards' | 'favorites' | 'scenes';
 export type HomeInformationCardKey = 'people' | 'climate' | 'outdoor_climate' | 'power' | 'device_groups';
 export type MasterActionConfirmationDomain = 'light' | 'switch' | 'fan' | 'cover' | 'lock';
 export type MasterActionConfirmationSettings = Partial<Record<MasterActionConfirmationDomain, boolean>>;
@@ -83,7 +83,17 @@ export interface DwainsDashboardSettings {
   home_scenes?: string[];
   /** Thermostat in the room header for rooms with one climate entity. Default on. */
   show_area_thermostat?: boolean;
-  /** Where the Now playing bar is shown. Default 'home'. */
+  /**
+   * Show the Now playing bar on the room pages. When not set, the room pages
+   * follow `now_playing_bar === 'all'`.
+   */
+  show_area_now_playing?: boolean;
+  /**
+   * Where the Now playing bar was shown before it became a Home section. Only
+   * read as a fallback: for Home while `now_playing` is in neither
+   * `home_sections_order` nor `home_sections_hidden`, and for the room pages
+   * while `show_area_now_playing` is not set.
+   */
   now_playing_bar?: 'off' | 'home' | 'all';
 }
 

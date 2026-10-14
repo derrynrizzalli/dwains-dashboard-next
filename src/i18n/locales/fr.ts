@@ -800,5 +800,9 @@ export const fr = {
   'settings.show_alarm': "Afficher la puce d'alarme sur la page d'accueil",
   'settings.show_alarm_description': "Désactivez cette option pour masquer la puce d'alarme sans retirer l'alarme choisie.",
   'settings.alarm_hidden': "Alarme masquée",
+  'home_section.now_playing.label': "En cours de lecture",
+  'home_section.now_playing.description': "Ce qui est lu sur vos lecteurs multimédias, avec lecture/pause et piste suivante. Sur téléphone, la barre flotte au-dessus de la navigation.",
+  'settings.show_area_now_playing': "Afficher la barre En cours de lecture sur les pages des pièces",
+  'settings.show_area_now_playing_description': "Affiche la barre En cours de lecture sous l'en-tête de la pièce, avec les lecteurs de toutes les pièces. La section de l'accueil s'active dans les réglages de la page d'accueil.",
 
 } as const satisfies TranslationDictionary;
