@@ -3128,6 +3128,13 @@ export const layoutCardStyles = css`
       transform: rotate(-90deg);
     }
 
+    /* Phones: the same space as between two groups of the room. */
+    @media (max-width: 768px) {
+      .area-view .area-favorites-section {
+        margin-bottom: 22px;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .area-favorites-chevron {
         transition: none;
