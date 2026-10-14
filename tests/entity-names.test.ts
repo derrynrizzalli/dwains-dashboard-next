@@ -72,6 +72,16 @@ describe('stripAreaNameFromEntityName', () => {
     expect(stripAreaNameFromEntityName('Office iMac', 'Office')).toBe('iMac');
   });
 
+  it('keeps the area name at the end when it is part of the sentence', () => {
+    expect(stripAreaNameFromEntityName('Lamp in the kitchen', 'Kitchen')).toBe('Lamp in the kitchen');
+    expect(stripAreaNameFromEntityName('Licht im Wohnzimmer', 'Wohnzimmer')).toBe('Licht im Wohnzimmer');
+    expect(stripAreaNameFromEntityName('Lamp van de keuken', 'Keuken')).toBe('Lamp van de keuken');
+    expect(stripAreaNameFromEntityName('Lumière de la cuisine', 'Cuisine')).toBe('Lumière de la cuisine');
+    // A bracket or punctuation still marks the area name.
+    expect(stripAreaNameFromEntityName('Lamp in the corner (Kitchen)', 'Kitchen')).toBe('Lamp in the corner');
+    expect(stripAreaNameFromEntityName('Spot by the door - Kitchen', 'Kitchen')).toBe('Spot by the door');
+  });
+
   it('can leave the end of the name alone', () => {
     expect(stripAreaNameFromEntityName('Lamp in the kitchen', 'Kitchen', { atEnd: false })).toBe('Lamp in the kitchen');
     expect(stripAreaNameFromEntityName('Kitchen lamp', 'Kitchen', { atEnd: false })).toBe('Lamp');

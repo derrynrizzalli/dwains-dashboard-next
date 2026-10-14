@@ -11,6 +11,22 @@ const SEPARATOR = String.raw`(?:\s*[${SEPARATOR_CHARS}]+\s*|\s+)`;
 /** Next to a bracketed area name the separator may be left out. */
 const OPTIONAL_SEPARATOR = String.raw`(?:\s*[${SEPARATOR_CHARS}]+\s*|\s*)`;
 
+/**
+ * Articles and prepositions in the supported languages. When one of these is
+ * right in front of the area name at the end ("Lamp in the kitchen", "Licht
+ * im Wohnzimmer"), the area name is part of the sentence and stays.
+ */
+const LINKING_WORDS = new Set([
+  'a', 'an', 'at', 'by', 'for', 'in', 'into', 'of', 'on', 'the', 'to',
+  'aan', 'bij', 'de', 'den', 'der', 'het', 'naar', 'op', 'van', 'voor',
+  'am', 'an', 'auf', 'beim', 'das', 'dem', 'die', 'im', 'ins', 'vom', 'zum', 'zur',
+  'au', 'aux', 'dans', 'des', 'du', 'la', 'le', 'les', 'sur', 'un', 'une',
+  'al', 'con', 'del', 'el', 'en', 'las', 'los', 'para', 'por',
+  'da', 'di', 'il', 'lo', 'nel', 'nella', 'per', 'sul', 'sulla',
+  'do', 'dos', 'na', 'no', 'nos', 'o', 'os',
+  'в', 'во', 'на', 'у',
+]);
+
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -49,13 +65,24 @@ export function stripAreaNameFromEntityName(
   const escapedArea = escapeRegExp(area).replace(/\s+/g, String.raw`\s+`);
   const bracketed = String.raw`(?:\(\s*${escapedArea}\s*\)|\[\s*${escapedArea}\s*\])`;
   const atStart = new RegExp(`^(?:${bracketed}${OPTIONAL_SEPARATOR}|${escapedArea}${SEPARATOR})`, 'iu');
-  const atEnd = new RegExp(`(?:${OPTIONAL_SEPARATOR}${bracketed}|${SEPARATOR}${escapedArea})$`, 'iu');
+  // At the end a bracket or punctuation always marks the area name; after a
+  // plain space it only counts when no article or preposition comes first.
+  const atEndMarked = new RegExp(`(?:${OPTIONAL_SEPARATOR}${bracketed}|\\s*[${SEPARATOR_CHARS}]+\\s*${escapedArea})$`, 'iu');
+  const atEndPlain = new RegExp(`\\s+${escapedArea}$`, 'iu');
 
   let result = trimmed;
   const withoutStart = result.replace(atStart, '');
   const strippedStart = withoutStart !== result;
   result = withoutStart.trim();
-  if (options.atEnd !== false && result) result = result.replace(atEnd, '').trim();
+  if (options.atEnd !== false && result) {
+    if (atEndMarked.test(result)) {
+      result = result.replace(atEndMarked, '').trim();
+    } else if (atEndPlain.test(result)) {
+      const rest = result.replace(atEndPlain, '').trim();
+      const lastWord = rest.split(/\s+/).pop()?.toLocaleLowerCase() || '';
+      if (!LINKING_WORDS.has(lastWord)) result = rest;
+    }
+  }
 
   if (!result) return original;
   return strippedStart ? capitalizeFirstWord(result) : result;
