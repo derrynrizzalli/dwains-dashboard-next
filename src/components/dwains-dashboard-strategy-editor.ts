@@ -1979,7 +1979,7 @@ export class DwainsDashboardStrategyEditor extends LitElement {
 
     const cameras = [...cameraIds].flatMap(entityId => {
       const state = this.hass!.states[entityId];
-      const registry = this.hass!.entities?.[entityId];
+      const registry = getEntityRegistry(this.hass)[entityId];
       const configured = configuredEntities.get(entityId);
       if (!state || registry?.hidden_by || registry?.entity_category === 'diagnostic' || registry?.entity_category === 'config') return [];
 

@@ -3,6 +3,7 @@ import { property, state } from 'lit/decorators.js';
 import type { HomeAssistant } from '../types/home-assistant';
 import type { DwainsDashboardConfig, AreaConfig, DeviceConfig, EntityConfig, FloorConfig } from '../types/strategy';
 import { ddLocalize } from '../utils/localize';
+import { getEntityRegistry, setFullEntityRegistry } from '../utils/entity-registry';
 import './dwains-layout-card';  // Import the file to register the custom element
 
 /**
@@ -94,17 +95,11 @@ export class DwainsDashboardCard extends LitElement {
         name: floor.name,
       }));
 
-      // Expose entity registry on hass so inner components can respect visibility (hidden_by)
-      // This mirrors what the strategy path does
-      (this.hass as any).entities = entities.reduce((acc: any, entity: any) => {
-        acc[entity.entity_id] = entity;
-        return acc;
-      }, {});
-
-      (this.hass as any).devices = devices.reduce((acc: any, device: any) => {
-        acc[device.id] = device;
-        return acc;
-      }, {});
+      // Keep the full entity registry for the inner components (hidden_by,
+      // disabled_by, created_at), like the strategy does. hass.devices from
+      // Home Assistant is already complete, and hass is shared with the rest
+      // of Home Assistant, so it is not changed.
+      setFullEntityRegistry(entities);
 
       // Create dashboard config
       this._dashboardConfig = {
@@ -126,7 +121,7 @@ export class DwainsDashboardCard extends LitElement {
       // Optional: simple debug helper in console
       (window as any).ddDebugEntity = (entityId: string) => {
         const state = this.hass?.states?.[entityId];
-        const registry = (this.hass as any)?.entities?.[entityId];
+        const registry = getEntityRegistry(this.hass)[entityId];
         console.log('[Dwains] Debug entity', entityId, { state, registry });
         return { state, registry };
       };
