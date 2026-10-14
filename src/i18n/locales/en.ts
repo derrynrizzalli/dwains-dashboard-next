@@ -31,7 +31,6 @@ export const en = {
   'area_header.open_count': '{active} of {total} open',
   'common.unknown': 'Unknown',
   'common.unavailable': 'Unavailable',
-  'common.none': 'None',
   'common.entity.one': '{count} entity',
   'common.entity.other': '{count} entities',
   'common.device.one': '{count} device',
@@ -48,7 +47,6 @@ export const en = {
   'common.favorite.other': '{count} favorites',
   'common.active.one': '{count} active',
   'common.active.other': '{count} active',
-  'common.just_now': 'just now',
 
   'sidebar.home': 'Home',
   'sidebar.add_blueprint': 'Add blueprint',
@@ -126,7 +124,6 @@ export const en = {
   'kiosk.saved_now': "Saved on this device",
   'kiosk.autosave_subtitle': "Changes on this page are saved automatically on this device.",
   'sidebar.section_title': 'Dwains Dashboard',
-  'sidebar.areas': 'Areas',
   'sidebar.show': 'Show area sidebar',
   'sidebar.collapse': 'Collapse area sidebar',
   'sidebar.resize': 'Resize area sidebar',
@@ -164,13 +161,9 @@ export const en = {
   'layout.done_editing': 'Done editing',
   'layout.edit_custom_cards': 'Edit custom cards',
   'layout.custom_cards_top': 'Top of area',
-  'layout.custom_cards_after': 'Below {section}',
   'layout.custom_cards_bottom': 'Bottom of area',
   'layout.drag_card': 'Drag card',
   'layout.drag_group': 'Drag section',
-  'layout.edit_page': 'Edit page',
-  'layout.page_settings': 'Settings / fill in again',
-  'layout.delete_page': 'Delete page',
   'layout.delete_page_confirm': 'Delete page "{name}"?',
   'layout.delete_page_message': 'This page and its card will be removed from the dashboard. This cannot be undone.',
   'layout.delete_card_confirm': 'Delete this card?',
@@ -314,13 +307,6 @@ export const en = {
   'action.all_switches_off': 'All switches off',
   'action.all_fans_on': 'All fans on',
   'action.all_fans_off': 'All fans off',
-  'action.toggle_lights': 'Toggle lights',
-  'action.toggle_fans': 'Toggle fans',
-  'action.confirm_fans': 'Are you sure you want to toggle all fans in this area?',
-  'action.toggle_switches': 'Toggle switches',
-  'action.toggle_covers': 'Toggle covers',
-  'action.confirm_lights': 'Are you sure you want to toggle all lights in this area?',
-  'action.confirm_switches': 'Are you sure you want to toggle all switches in this area?',
   'action.scene_activated': 'Scene activated',
   'action.open': 'Open',
   'action.close': 'Close',
@@ -341,8 +327,6 @@ export const en = {
 
   'entity.not_activated': 'Not activated yet',
   'entity.no_events': 'No events yet',
-  'entity.power_usage': 'Power usage',
-  'entity.select_value': 'Select value',
   'entity.update_failed': 'Could not update entity',
   'entity.selector_failed': 'Could not update selector',
   'entity.cover_failed': 'Could not update cover',
@@ -486,7 +470,6 @@ export const en = {
   'devices.unavailable_device.other': '{count} unavailable devices',
   'devices.new_description': 'Devices added to Home Assistant in the last {hours} hours.',
   'devices.new_empty': 'No devices were added to Home Assistant in the last {hours} hours.',
-  'devices.save_visibility_failed': 'Could not save device visibility:\n{error}',
 
   'dialog.active_empty': 'No active entities found',
   'dialog.problem_empty': 'No problematic entities found',
@@ -505,7 +488,6 @@ export const en = {
   'dialog.vibration_sensors': 'Vibration sensors',
   'dialog.no_area': 'No area',
 
-  'replacement.title': 'Blueprint replacements',
   'replacement.domain_replacements': 'Domain replacements',
   'replacement.assign': 'Assign replacement',
   'replacement.domain': 'Domain',
@@ -514,7 +496,7 @@ export const en = {
   'replacement.entity_hint': 'Entity and name are filled automatically for each rendered entity.',
   'replacement.applies_to': 'Will be applied to {domain} entities in both views.',
   'replacement.views_title': 'Area view + Devices view',
-  'replacement.views_description': 'Domain replacements are applied to standard entity cards in both views, like DD3.',
+  'replacement.views_description': 'Replacements apply to matching standard entity cards in Area and Devices views.',
   'replacement.target': 'Domain · {domain}',
   'replacement.applies_hint': 'Applies to matching entities in both area and devices views.',
   'replacement.search': 'Search replace-card blueprints',
@@ -615,11 +597,8 @@ export const en = {
   'settings.selected_entities': 'Selected entities',
   'settings.selected_weather': 'Selected weather entity',
   'settings.selected_alarm': 'Selected alarm entity',
-  'settings.no_weather': 'No weather entity selected. Weather is hidden on the home page.',
   'settings.no_alarm': 'No alarm entity selected. The alarm chip is hidden on the home page.',
   'settings.no_persons': 'No persons found',
-  'settings.visible_in_dd': 'Visible in DD',
-  'settings.hidden_in_dd': 'Hidden in DD',
   'settings.discard_confirm': 'Discard unsaved dashboard settings?',
   'settings.discard_message': 'Changes you made to the dashboard settings will be lost.',
   'settings.discard': 'Discard',
@@ -752,8 +731,6 @@ export const en = {
   'error.settings_save': 'Could not save dashboard settings: {error}',
   'error.notification_dismiss': 'Could not dismiss this notification.',
   'error.notifications_dismiss_all': 'Could not dismiss all notifications.',
-  'error.image_load': 'Image could not be loaded',
-  'error.canvas_unavailable': 'Canvas context unavailable',
 
   'domain.light': 'Lights',
   'domain.switch': 'Switches',
@@ -830,8 +807,6 @@ export const en = {
   'device_class.door_lock': 'Locks',
   'settings.home_climate_areas_title': "Areas included in indoor climate",
   'settings.home_climate_areas_description': "Choose which Home Assistant areas are included in the average temperature and humidity shown in House information.",
-  'settings.home_climate_area_included': "Included in house average",
-  'settings.home_climate_area_excluded': "Excluded from house average",
   'settings.home_outdoor_climate_areas_title': "Outdoor areas",
   'settings.home_outdoor_climate_areas_description': "Choose which Home Assistant areas are outdoors. Their assigned temperature and humidity sensors are shown in the Outdoor climate card and left out of the indoor climate.",
   'settings.home_climate_area_outdoor': "Used for outdoor climate",
@@ -839,4 +814,12 @@ export const en = {
 } as const;
 
 export type TranslationKey = keyof typeof en;
-export type TranslationDictionary = Record<TranslationKey, string>;
+
+type PluralBase = {
+  [Key in TranslationKey]: Key extends `${infer Base}.other` ? Base : never;
+}[TranslationKey];
+
+/** Extra plural forms a language can add on top of the shared one/other keys. */
+export type PluralFormKey = `${PluralBase}.${'zero' | 'two' | 'few' | 'many'}`;
+
+export type TranslationDictionary = Record<TranslationKey, string> & Partial<Record<PluralFormKey, string>>;
