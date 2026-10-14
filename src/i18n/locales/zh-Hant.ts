@@ -471,6 +471,7 @@ export const zhHant = {
   'dialog.tamper_sensors': '篡改感測器',
   'dialog.vibration_sensors': '振動感測器',
   'dialog.no_area': '無區域',
+  'navigation.open_devices': '開啟裝置檢視',
   'replacement.title': '藍圖取代卡片',
   'replacement.domain_replacements': '網域取代',
   'replacement.assign': '指派取代',

@@ -487,6 +487,7 @@ export const ru = {
   'dialog.tamper_sensors': 'Датчики вскрытия',
   'dialog.vibration_sensors': 'Датчики вибрации',
   'dialog.no_area': 'Без области',
+  'navigation.open_devices': 'Открыть раздел устройств',
 
   'replacement.title': 'Замены шаблонов',
   'replacement.domain_replacements': 'Замены доменов',

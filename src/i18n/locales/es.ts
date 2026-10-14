@@ -471,6 +471,7 @@ export const es = {
   'dialog.tamper_sensors': 'Sensores de manipulación',
   'dialog.vibration_sensors': 'Sensores de vibración',
   'dialog.no_area': 'Sin área',
+  'navigation.open_devices': 'Abrir la vista Dispositivos',
   'replacement.title': 'Reemplazos de planos',
   'replacement.domain_replacements': 'Reemplazos de dominio',
   'replacement.assign': 'Asignar reemplazo',

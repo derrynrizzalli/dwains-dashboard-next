@@ -471,6 +471,7 @@ export const nl = {
   'dialog.tamper_sensors': 'Sabotagesensoren',
   'dialog.vibration_sensors': 'Trillingssensoren',
   'dialog.no_area': 'Geen gebied',
+  'navigation.open_devices': 'Apparatenweergave openen',
   'replacement.title': 'Vervangingen van blauwdrukken',
   'replacement.domain_replacements': 'Domeinvervangingen',
   'replacement.assign': 'Vervanging toewijzen',

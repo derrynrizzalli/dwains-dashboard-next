@@ -471,6 +471,7 @@ export const zhHans = {
   'dialog.tamper_sensors': '篡改传感器',
   'dialog.vibration_sensors': '振动传感器',
   'dialog.no_area': '无区域',
+  'navigation.open_devices': '打开设备视图',
   'replacement.title': '蓝图取代卡片',
   'replacement.domain_replacements': '网域取代',
   'replacement.assign': '指派取代',

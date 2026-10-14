@@ -56,6 +56,14 @@ House information can show:
 
 Each house information card can be enabled or disabled in Dashboard settings.
 
+Tapping a card opens a popup instead of leaving Home:
+
+- **People** (and the **+N** chip) lists everyone with their picture and where they are. Tap a person for the Home Assistant details.
+- **Indoor climate** and **Outdoor climate** show the sensors per room, in the same order as your areas. Tap a single value to see only temperature or only humidity.
+- **Device group cards** show the entities per room. The buttons at the top switch, open or lock everything; each room has its own action as well: an on/off switch with how many are on (when the room has more than one), open and close for covers, and lock and unlock for locks. Unlocking always asks for confirmation; the other room actions follow the master action confirmations in Dashboard settings.
+
+The link in the popup header opens the matching Devices page. On a phone the popups open as a sheet from the bottom: pull it down to close it.
+
 ### Indoor and outdoor climate
 
 The climate cards use the temperature and humidity sensors that are linked to each area in Home Assistant. Link them in **Settings > Areas, labels & zones**, open the area and choose its temperature and humidity sensor.

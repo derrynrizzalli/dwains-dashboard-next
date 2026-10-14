@@ -471,6 +471,7 @@ export const de = {
   'dialog.tamper_sensors': 'Manipulationssensoren',
   'dialog.vibration_sensors': 'Vibrationssensoren',
   'dialog.no_area': 'Kein Bereich',
+  'navigation.open_devices': 'Geräteansicht öffnen',
   'replacement.title': 'Blueprint-Ersetzungen',
   'replacement.domain_replacements': 'Domain-Ersetzungen',
   'replacement.assign': 'Ersatz zuweisen',

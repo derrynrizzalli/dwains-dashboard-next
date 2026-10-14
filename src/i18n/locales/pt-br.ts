@@ -487,6 +487,7 @@ export const ptBR = {
   'dialog.tamper_sensors': 'Sensores de violação',
   'dialog.vibration_sensors': 'Sensores de vibração',
   'dialog.no_area': 'Sem área',
+  'navigation.open_devices': 'Abrir a visualização de dispositivos',
 
   'replacement.title': 'Substituições de blueprint',
   'replacement.domain_replacements': 'Substituições por domínio',

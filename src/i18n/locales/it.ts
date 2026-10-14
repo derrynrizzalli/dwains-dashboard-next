@@ -487,6 +487,7 @@ export const it = {
   'dialog.tamper_sensors': 'Sensori antimanomissione',
   'dialog.vibration_sensors': 'Sensori di vibrazione',
   'dialog.no_area': 'Nessuna stanza',
+  'navigation.open_devices': 'Apri la vista Dispositivi',
 
   'replacement.title': 'Sostituzioni blueprint',
   'replacement.domain_replacements': 'Sostituzioni per dominio',

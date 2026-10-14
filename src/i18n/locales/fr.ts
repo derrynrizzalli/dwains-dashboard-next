@@ -471,6 +471,7 @@ export const fr = {
   'dialog.tamper_sensors': 'Capteurs d\'autoprotection',
   'dialog.vibration_sensors': 'Capteurs de vibrations',
   'dialog.no_area': 'Aucune zone',
+  'navigation.open_devices': 'Ouvrir la vue Appareils',
   'replacement.title': 'Remplacements de plans',
   'replacement.domain_replacements': 'Remplacements de domaines',
   'replacement.assign': 'Attribuer un remplacement',

@@ -485,6 +485,7 @@ export const en = {
   'dialog.tamper_sensors': 'Tamper sensors',
   'dialog.vibration_sensors': 'Vibration sensors',
   'dialog.no_area': 'No area',
+  'navigation.open_devices': 'Open device view',
 
   'replacement.title': 'Blueprint replacements',
   'replacement.domain_replacements': 'Domain replacements',
