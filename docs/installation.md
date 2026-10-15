@@ -39,3 +39,15 @@ After installation, create the dashboard from the native Home Assistant dashboar
 3. Click Add dashboard.
 4. Choose Dwains Dashboard Next.
 5. Give it a name and save.
+
+## Troubleshooting
+
+### "Error loading the dashboard strategy"
+
+Home Assistant shows this when it cannot start the dashboard, for example "Timeout waiting for strategy element ll-strategy-dashboard-dwains-dashboard-next to be registered" or "Dwains Dashboard Next could not load its files".
+
+- Refresh the page. On a wall tablet or in a kiosk browser, clear the browser cache of that device. This helps when the device still uses files from before an update.
+- When you installed Dwains Dashboard Next by hand, copy the whole `dist` folder, including the `chunks` folder next to `dwains-dashboard-next.js`.
+- Check that the resource `/hacsfiles/dwains-dashboard-next/dwains-dashboard-next.js` (type `module`) exists in **Settings > Dashboards > Resources**, or in your YAML resources.
+
+Older browsers and webviews, for example on some wall displays, get the legacy frontend of Home Assistant, which loads slower. Since 1.12.1 Dwains Dashboard Next registers itself before it loads the rest, so it starts in time on these devices too.

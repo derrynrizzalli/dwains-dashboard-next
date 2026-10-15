@@ -1,7 +1,9 @@
-import { DwainsDashboardStrategy } from './strategies/dashboard-strategy';
-import { DwainsViewStrategy } from './strategies/view-strategy';
-
+// The entry file registers the strategies right away and loads everything else
+// afterwards. Home Assistant waits at most 5 seconds for a custom strategy to
+// be registered; with nothing to load first, that also fits on slow wall
+// tablets and devices that get Home Assistant's legacy frontend.
 import { DD_NEXT_VERSION } from './version';
+import { loadPart } from './utils/load-part';
 
 console.log(`%cDwains Dashboard Next ${DD_NEXT_VERSION}`, 'background:#3a7;color:#fff;padding:2px 8px;border-radius:6px;font-weight:bold');
 
@@ -10,7 +12,21 @@ const VIEW_STRATEGY_TYPE = 'dwains-dashboard-next-view';
 const DASHBOARD_STRATEGY_TAG = `ll-strategy-dashboard-${DASHBOARD_STRATEGY_TYPE}`;
 const VIEW_STRATEGY_TAG = `ll-strategy-view-${VIEW_STRATEGY_TYPE}`;
 const DASHBOARD_CARD_TYPE = 'dwains-dashboard-next-card';
-let uiElementsReady: Promise<void> = Promise.resolve().then(() => loadUiElements());
+
+const loadDashboardStrategy = () =>
+  loadPart(() => import('./strategies/dashboard-strategy')).then((module) => module.DwainsDashboardStrategy);
+const loadViewStrategy = () =>
+  loadPart(() => import('./strategies/view-strategy')).then((module) => module.DwainsViewStrategy);
+
+let uiElementsReady: Promise<void> | undefined;
+/** Loads the dashboard cards once; after a failure the next call tries again. */
+const ensureUiElements = (): Promise<void> => {
+  uiElementsReady ??= loadUiElements().catch((error) => {
+    uiElementsReady = undefined;
+    throw error;
+  });
+  return uiElementsReady;
+};
 
 // Safe element registration
 const safeDefine = (name: string, constructor: CustomElementConstructor) => {
@@ -21,19 +37,20 @@ const safeDefine = (name: string, constructor: CustomElementConstructor) => {
 
 const createDashboardStrategyElement = () => class extends HTMLElement {
   static async generate(config: any, hass: any) {
-    await uiElementsReady;
+    const [DwainsDashboardStrategy] = await Promise.all([loadDashboardStrategy(), ensureUiElements()]);
     const strategy = new DwainsDashboardStrategy();
     return strategy.generate(config, hass);
   }
 
   static async getConfigElement() {
+    const DwainsDashboardStrategy = await loadDashboardStrategy();
     return DwainsDashboardStrategy.getConfigElement();
   }
 };
 
 const createViewStrategyElement = () => class extends HTMLElement {
   static async generate(config: any, hass: any) {
-    await uiElementsReady;
+    const [DwainsViewStrategy] = await Promise.all([loadViewStrategy(), ensureUiElements()]);
     const strategy = new DwainsViewStrategy();
     return strategy.generate(config, hass);
   }
@@ -50,33 +67,29 @@ safeDefine('ll-strategy-dashboard-dwains', createDashboardStrategyElement());
 safeDefine('ll-strategy-view-dwains-view', createViewStrategyElement());
 
 async function loadUiElements(): Promise<void> {
-  try {
-    // Only what is needed to show the dashboard is loaded up front. Editors and
-    // dialogs are loaded when they are opened.
-    const [
-      { DwainsDashboardCard },
-      { DwainsFlexboxCard },
-      { DwainsHeadingCard },
-    ] = await Promise.all([
-      import('./components/dwains-dashboard-card'),
-      import('./components/cards/dwains-flexbox-card'),
-      import('./components/cards/dwains-heading-card'),
-      import('./components/dwains-layout-card'),
-      import('./components/dwains-page-card'),
-      import('./components/dwains-devices-card'),
-      import('./components/dwains-bottom-nav'),
-    ]);
+  // Only what is needed to show the dashboard is loaded up front. Editors and
+  // dialogs are loaded when they are opened. A failure reaches Home Assistant
+  // through generate(), with the message of loadPart().
+  const [
+    { DwainsDashboardCard },
+    { DwainsFlexboxCard },
+    { DwainsHeadingCard },
+  ] = await loadPart(() => Promise.all([
+    import('./components/dwains-dashboard-card'),
+    import('./components/cards/dwains-flexbox-card'),
+    import('./components/cards/dwains-heading-card'),
+    import('./components/dwains-layout-card'),
+    import('./components/dwains-page-card'),
+    import('./components/dwains-devices-card'),
+    import('./components/dwains-bottom-nav'),
+  ]));
 
-    safeDefine(DASHBOARD_CARD_TYPE, DwainsDashboardCard);
-    safeDefine('dwains-flexbox-card', class extends DwainsFlexboxCard {});
-    safeDefine('dwains-heading-card', DwainsHeadingCard);
+  safeDefine(DASHBOARD_CARD_TYPE, DwainsDashboardCard);
+  safeDefine('dwains-flexbox-card', class extends DwainsFlexboxCard {});
+  safeDefine('dwains-heading-card', DwainsHeadingCard);
 
-    // Legacy card alias for early Next configs when old DD is not installed.
-    safeDefine('dwains-dashboard-card', class extends DwainsDashboardCard {});
-
-  } catch (err) {
-    console.error('Dwains Dashboard Next - Failed to load UI elements', err);
-  }
+  // Legacy card alias for early Next configs when old DD is not installed.
+  safeDefine('dwains-dashboard-card', class extends DwainsDashboardCard {});
 }
 
 // Global interface declaration
@@ -221,5 +234,6 @@ if (!Array.isArray(window.customCards)) {
   });
 }
 
-// Export for external use if needed
-export { DwainsDashboardStrategy, DwainsViewStrategy };
+// Start loading the dashboard right away, so it is ready by the time Home
+// Assistant asks for it. A failure is reported when Home Assistant does.
+ensureUiElements().catch(() => undefined);
