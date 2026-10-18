@@ -15,7 +15,8 @@ import { updateStoredDashboardStrategy } from '../utils/dashboard-config-store';
 import { isNonAdminUser } from '../utils/security';
 import { getAreaIcon, getDomainIcon, getDeviceClassIcon, getDomainColor } from '../utils/icons';
 import { getDomainName, getDeviceClassName } from '../utils/domain-names';
-import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
+import { findReplacementAssignment, haFallbackEntityCardConfig, resolveEntityCardConfig } from '../utils/blueprint-replacements';
+import { isMushroomCardType } from '../utils/mushroom-tiles';
 import { areaEntityDisplayName } from '../utils/entity-names';
 import {
   NEW_DEVICE_WINDOW_HOURS,
@@ -112,7 +113,7 @@ interface DeviceGroupCard {
  * styling volgen exact de patronen van dwains-dashboard-next-layout-card zodat het er identiek
  * uitziet en aanvoelt.
  */
-@customElement('dwains-dashboard-next-devices-card')
+@customElement('dwains-dashboard-next-devices-impl')
 export class DwainsDevicesCard extends LitElement {
   private _hass: any;
   private config?: DwainsDashboardConfig;
@@ -157,6 +158,7 @@ export class DwainsDevicesCard extends LitElement {
       areas_options: config.areas_options,
       settings: config.settings,
       blueprint_replacements: config.blueprint_replacements,
+      mushroom_tile_overrides: config.mushroom_tile_overrides,
       device_admission: config.device_admission,
     };
     if (this._hass) ensureBottomNav(this._hass, this.config.settings);
@@ -793,10 +795,6 @@ export class DwainsDevicesCard extends LitElement {
   }
 
   private _entityCardConfig(entityId: string, areaName?: string): any {
-    if (entityId.startsWith('todo.')) {
-      return { type: 'todo-list', entity: entityId };
-    }
-
     const params = {
       hass: this._hass,
       config: this.config,
@@ -804,14 +802,30 @@ export class DwainsDevicesCard extends LitElement {
       surface: 'devices_cards' as const,
     };
     const cardConfig = resolveEntityCardConfig(params);
-    // The area group already shows the area, so the default cards drop it from
-    // the entity name. Blueprint replacements keep their own naming.
-    if (!areaName || !NAMED_DEFAULT_CARD_TYPES.has(cardConfig.type) || cardConfig.name !== undefined) {
-      return cardConfig;
-    }
+    // Blueprint replacements keep their own naming. Default cards drop the
+    // area, which the group heading already shows.
     const assignment = findReplacementAssignment(params);
     if (assignment && assignment.enabled !== false) return cardConfig;
+    return this._withShortAreaName(
+      entityId,
+      areaName,
+      cardConfig,
+      NAMED_DEFAULT_CARD_TYPES.has(cardConfig.type) || isMushroomCardType(cardConfig.type)
+    );
+  }
 
+  private _haFallbackCardConfig(entityId: string, areaName?: string): any {
+    const cardConfig = haFallbackEntityCardConfig(entityId, this._hass);
+    return this._withShortAreaName(
+      entityId,
+      areaName,
+      cardConfig,
+      NAMED_DEFAULT_CARD_TYPES.has(cardConfig.type)
+    );
+  }
+
+  private _withShortAreaName(entityId: string, areaName: string | undefined, cardConfig: any, allowName: boolean): any {
+    if (!areaName || !allowName || cardConfig.name !== undefined) return cardConfig;
     const fullName = this._hass.states?.[entityId]?.attributes?.friendly_name;
     if (typeof fullName !== 'string' || !fullName) return cardConfig;
     const name = areaEntityDisplayName(fullName, areaName, this.config?.settings);
@@ -1401,12 +1415,17 @@ export class DwainsDevicesCard extends LitElement {
   private _renderEntityCard(entity: EntityConfig, areaName?: string) {
     const state = this._hass.states[entity.entity_id];
     if (!state) return nothing;
+    const config = this._entityCardConfig(entity.entity_id, areaName);
+    const fallbackConfig = isMushroomCardType(config?.type)
+      ? this._haFallbackCardConfig(entity.entity_id, areaName)
+      : undefined;
 
     return html`
       <div class="${this._entityWrapperClass(entity.entity_id)}">
         <dwains-dashboard-next-card-host
           .hass=${this._hass}
-          .config=${this._entityCardConfig(entity.entity_id, areaName)}
+          .config=${config}
+          .fallbackConfig=${fallbackConfig}
         ></dwains-dashboard-next-card-host>
       </div>
     `;
@@ -2275,22 +2294,23 @@ export class DwainsDevicesCard extends LitElement {
 
     .entities-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
       gap: 8px;
+      align-items: stretch;
     }
 
     .entities-grid.cover-entities-grid {
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 12px;
     }
 
     .entities-grid.light-entities-grid {
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 12px;
     }
 
     .entities-grid.sensor-entities-grid {
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
       gap: 12px;
     }
 
@@ -2305,8 +2325,20 @@ export class DwainsDevicesCard extends LitElement {
     }
 
     .entity-card-wrapper {
-      min-height: 60px;
+      min-height: 72px;
+      min-width: 0;
       position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .entity-card-wrapper dwains-dashboard-next-card-host,
+    .entity-card-wrapper dwains-dashboard-next-card-host > * {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      height: 100%;
+      box-sizing: border-box;
     }
 
     .cover-entity-card {
@@ -2318,7 +2350,7 @@ export class DwainsDevicesCard extends LitElement {
     }
 
     .sensor-entity-card {
-      min-height: 150px;
+      min-height: 72px;
     }
 
     .motion-entity-card {
@@ -2640,6 +2672,6 @@ export class DwainsDevicesCard extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'dwains-dashboard-next-devices-card': DwainsDevicesCard;
+    'dwains-dashboard-next-devices-impl': DwainsDevicesCard;
   }
 }

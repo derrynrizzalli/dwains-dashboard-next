@@ -33,9 +33,6 @@ function resolveLanguage(input: string): SupportedLanguage {
     .toLowerCase()
     .replace(/_/g, '-');
 
-  if (/^zh-(hant|tw|hk|mo)(-|$)/.test(raw) || raw === 'zh') return 'zh-hant';
-  if (/^zh-(hans|cn|sg)(-|$)/.test(raw)) return 'zh-hans';
-
   const parts = raw.split('-');
   while (parts.length) {
     const candidate = parts.join('-') as SupportedLanguage;

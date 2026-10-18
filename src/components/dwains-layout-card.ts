@@ -39,6 +39,12 @@ import {
 import { getDeviceClassName, getDomainName } from '../utils/domain-names';
 import { filterHiddenDeviceEntities } from '../utils/device-admission';
 import { findReplacementAssignment, resolveEntityCardConfig } from '../utils/blueprint-replacements';
+import {
+  ensureMushroomAvailable,
+  isMushroomCardType,
+  mushroomElementReady,
+  resolveEntityTileCard,
+} from '../utils/mushroom-tiles';
 import { restrictNonAdminDashboardSettings } from '../utils/security';
 import {
   areaEntityDeviceLabel,
@@ -279,6 +285,8 @@ export class DwainsLayoutCard extends LitElement {
   @state() private _deviceSettingsJustSaved = false;
   private _deviceSettingsSavedTimer?: number;
   @state() private _settingsSaveError = '';
+  /** undefined while lovelace-mushroom is still loading, then true or false. */
+  @state() private _mushroomTiles: boolean | undefined = mushroomElementReady() ? true : undefined;
 
   // Performance: Home Assistant sets `hass` on every state change of any
   // entity. Derived data is cached on the identity of its inputs, so it is
@@ -546,6 +554,7 @@ export class DwainsLayoutCard extends LitElement {
     window.addEventListener(WALL_TABLET_RESET_EVENT, this._handleWallTabletReset);
     this._startTimeUpdate();
     this._initializeObservers();
+    this._startMushroomProbe();
     // After navigating away and back the card is connected again: subscribe
     // again without waiting for a hass update that needs a render.
     if (this.hass && this.config) {
@@ -586,6 +595,13 @@ export class DwainsLayoutCard extends LitElement {
   private _handleTranslationsLoaded = (): void => {
     this.requestUpdate();
   };
+
+  private _startMushroomProbe(): void {
+    if (this._mushroomTiles === true) return;
+    void ensureMushroomAvailable().then((ready) => {
+      if (this._mushroomTiles !== ready) this._mushroomTiles = ready;
+    });
+  }
 
   disconnectedCallback() {
     super.disconnectedCallback();
@@ -3685,6 +3701,9 @@ export class DwainsLayoutCard extends LitElement {
     const domain = entityId.split('.')[0] || 'unknown';
     const deviceClass = state.attributes?.device_class;
     const name = state.attributes?.friendly_name || registry?.name || entityId;
+    const mushroomTile = this._renderMushroomEntityTile(entityId, name, 'favorite-mushroom-card');
+    if (mushroomTile !== undefined) return mushroomTile;
+
     const formattedState = this._formatFavoriteState(state);
     const areaName = this._entityAreaName(entityId);
     const icon = registry?.icon || state.attributes?.icon || getDeviceClassIcon(domain, deviceClass) || getDomainIcon(domain);
@@ -5736,10 +5755,45 @@ export class DwainsLayoutCard extends LitElement {
     });
   }
 
-  private _renderAreaReplacementCard(entityId: string, cardConfig: any) {
+  /**
+   * Mushroom card for one entity, a non-Mushroom replacement blueprint, or
+   * nothing while the caller should draw the built-in article (or a placeholder).
+   * `undefined` means "keep going with the article". A pending placeholder is a template.
+   */
+  private _renderMushroomEntityTile(entityId: string, name: string | undefined, tileClass: string) {
+    const replacement = this._areaReplacementCardConfig(entityId);
+    if (replacement && !isMushroomCardType(replacement.type)) {
+      return this._renderHostedEntityCard(entityId, replacement, tileClass);
+    }
+    if (!replacement && entityId.startsWith('todo.')) {
+      return this._renderTodoListCard({ entity_id: entityId });
+    }
+    if (this._mushroomTiles !== true) {
+      if (this._mushroomTiles === undefined) {
+        return html`<div class="${tileClass} is-pending" data-entity=${entityId}></div>`;
+      }
+      return undefined;
+    }
+    const config = replacement ?? resolveEntityTileCard({
+      entityId,
+      name,
+      overrides: this.config?.mushroom_tile_overrides,
+    });
+    return this._renderHostedEntityCard(entityId, config, tileClass);
+  }
+
+  private _renderHostedEntityCard(entityId: string, cardConfig: any, mushroomClass: string) {
+    const todo = cardConfig?.type === 'todo-list';
+    const mushroom = isMushroomCardType(cardConfig?.type);
+    const wrap = todo
+      ? 'mobile-todo-list-card'
+      : mushroom
+        ? mushroomClass
+        : 'mobile-entity-replacement-card';
     return html`
-      <div class="mobile-entity-replacement-card" data-entity=${entityId}>
+      <div class=${wrap} data-entity=${entityId}>
         <dwains-dashboard-next-card-host
+          ?eager=${todo}
           .hass=${this.hass}
           .config=${cardConfig}
         ></dwains-dashboard-next-card-host>
@@ -5753,19 +5807,15 @@ export class DwainsLayoutCard extends LitElement {
 
     const state = this._getEffectiveEntityState(rawState);
     const domain = entity.entity_id.split('.')[0] || 'unknown';
-    if (domain === 'todo') return this._renderTodoListCard(entity);
+    const fullName = state.attributes?.friendly_name || getEntityRegistry(this.hass)[entity.entity_id]?.name || entity.entity_id;
+    const name = areaEntityDisplayName(fullName, area.name, this.config?.settings);
+    const mushroomTile = this._renderMushroomEntityTile(entity.entity_id, name, 'mobile-entity-mushroom-card');
+    if (mushroomTile !== undefined) return mushroomTile;
 
     const deviceClass = state.attributes?.device_class;
-    const replacementConfig = this._areaReplacementCardConfig(entity.entity_id);
-    if (replacementConfig) {
-      return this._renderAreaReplacementCard(entity.entity_id, replacementConfig);
-    }
-
     const icon = getEntityRegistry(this.hass)[entity.entity_id]?.icon || state.attributes?.icon || getDeviceClassIcon(domain, deviceClass) || getDomainIcon(domain);
-    const fullName = state.attributes?.friendly_name || getEntityRegistry(this.hass)[entity.entity_id]?.name || entity.entity_id;
     // The page already shows the room, so drop the area name from the tile
     // (unless turned off) and use the second line for the device when that adds something.
-    const name = areaEntityDisplayName(fullName, area.name, this.config?.settings);
     const deviceLabel = areaEntityDeviceLabel(name, this._entityDeviceName(entity.entity_id), area.name);
     const active = this._isEntityActiveForUi(state, domain);
     const actionKind = this._mobileEntityActionKind(domain);
@@ -6834,7 +6884,12 @@ export class DwainsLayoutCard extends LitElement {
     if (!state) return nothing;
 
     return html`
-      <dwains-dashboard-next-tile-host class="favorite-tile-wrapper" .hass=${this.hass} entity="${entityId}"></dwains-dashboard-next-tile-host>
+      <dwains-dashboard-next-tile-host
+        class="favorite-tile-wrapper"
+        .hass=${this.hass}
+        .dashboardConfig=${this.config}
+        entity="${entityId}"
+      ></dwains-dashboard-next-tile-host>
     `;
   }
 

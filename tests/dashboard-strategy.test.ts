@@ -58,6 +58,9 @@ const PERSISTED: { [K in PersistedKey]-?: NonNullable<DwainsDashboardConfig[K]> 
       },
     },
   },
+  mushroom_tile_overrides: {
+    light: { type: 'custom:mushroom-template-card', primary: 'Lamp', icon: 'mdi:lightbulb' },
+  },
   device_admission: { hidden_devices: ['dev-plug'], first_seen_devices: { 'dev-lamp': 1767225600000 } },
 };
 
@@ -98,6 +101,7 @@ describe('dashboard settings pass-through', () => {
       'favorites',
       'floors_display',
       'home_custom_cards',
+      'mushroom_tile_overrides',
       'pages',
       'settings',
     ]);
@@ -249,13 +253,14 @@ describe('DwainsDashboardStrategy', () => {
     });
   });
 
-  it('uses the default title and localized view titles', async () => {
+  it('uses the default title and English view titles', async () => {
     const dashboard = await new DwainsDashboardStrategy().generate(
       { type: 'custom:dwains-dashboard-next' },
       mockHass({ language: 'nl' })
     );
     expect(dashboard.title).toBe('Dwains Dashboard');
-    expect(viewByPath(dashboard.views, 'devices').title).toBe('Apparaten');
+    expect(viewByPath(dashboard.views, 'devices').title).toBe('Devices');
+    expect(viewByPath(dashboard.views, 'home').title).toBe('Home');
     expect(dashboard.views.map((view) => view.path)).toEqual(['home', 'devices', 'add-blueprint']);
   });
 

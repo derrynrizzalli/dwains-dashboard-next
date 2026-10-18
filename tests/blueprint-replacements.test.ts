@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   countReplacementAssignments,
   countReplacementRules,
-  defaultEntityCardConfig,
+  haFallbackEntityCardConfig,
   domainReplacementEntries,
   findReplacementAssignment,
   resolveEntityCardConfig,
@@ -44,19 +44,19 @@ const assignment = (name: string, card = 'tile', extra: Partial<BlueprintReplace
   ...extra,
 });
 
-describe('defaultEntityCardConfig', () => {
+describe('haFallbackEntityCardConfig', () => {
   it('picks a dedicated card for climate, camera and media players', () => {
-    expect(defaultEntityCardConfig('climate.living', hass)).toEqual({ type: 'thermostat', entity: 'climate.living' });
-    expect(defaultEntityCardConfig('camera.door', hass)).toEqual({
+    expect(haFallbackEntityCardConfig('climate.living', hass)).toEqual({ type: 'thermostat', entity: 'climate.living' });
+    expect(haFallbackEntityCardConfig('camera.door', hass)).toEqual({
       type: 'picture-entity',
       entity: 'camera.door',
       camera_view: 'live',
     });
-    expect(defaultEntityCardConfig('media_player.tv', hass)).toEqual({ type: 'media-control', entity: 'media_player.tv' });
+    expect(haFallbackEntityCardConfig('media_player.tv', hass)).toEqual({ type: 'media-control', entity: 'media_player.tv' });
   });
 
   it('adds brightness and color temperature features to dimmable lights', () => {
-    expect(defaultEntityCardConfig('light.dimmable', hass)).toEqual({
+    expect(haFallbackEntityCardConfig('light.dimmable', hass)).toEqual({
       type: 'tile',
       entity: 'light.dimmable',
       state_content: ['state', 'brightness'],
@@ -68,32 +68,32 @@ describe('defaultEntityCardConfig', () => {
   });
 
   it('keeps on/off lights simple', () => {
-    const card = defaultEntityCardConfig('light.onoff', hass);
+    const card = haFallbackEntityCardConfig('light.onoff', hass);
     expect(card.state_content).toBe('state');
     expect(card).not.toHaveProperty('features');
   });
 
   it('adds a position slider only to covers that support it', () => {
-    expect(defaultEntityCardConfig('cover.blind', hass).features).toEqual([
+    expect(haFallbackEntityCardConfig('cover.blind', hass).features).toEqual([
       { type: 'cover-open-close' },
       { type: 'cover-position' },
     ]);
-    expect(defaultEntityCardConfig('cover.garage', hass).features).toEqual([{ type: 'cover-open-close' }]);
+    expect(haFallbackEntityCardConfig('cover.garage', hass).features).toEqual([{ type: 'cover-open-close' }]);
   });
 
   it('shows a graph for measurement sensors and a tile otherwise', () => {
-    expect(defaultEntityCardConfig('sensor.power', hass)).toMatchObject({ type: 'sensor', graph: 'line', hours_to_show: 24 });
-    expect(defaultEntityCardConfig('sensor.status', hass)).toEqual({ type: 'tile', entity: 'sensor.status' });
+    expect(haFallbackEntityCardConfig('sensor.power', hass)).toMatchObject({ type: 'sensor', graph: 'line', hours_to_show: 24 });
+    expect(haFallbackEntityCardConfig('sensor.status', hass)).toEqual({ type: 'tile', entity: 'sensor.status' });
   });
 
   it('shows when motion was last seen', () => {
-    expect(defaultEntityCardConfig('binary_sensor.hall_motion', hass).state_content).toEqual(['state', 'last_changed']);
-    expect(defaultEntityCardConfig('binary_sensor.door', hass)).toEqual({ type: 'tile', entity: 'binary_sensor.door' });
+    expect(haFallbackEntityCardConfig('binary_sensor.hall_motion', hass).state_content).toEqual(['state', 'last_changed']);
+    expect(haFallbackEntityCardConfig('binary_sensor.door', hass)).toEqual({ type: 'tile', entity: 'binary_sensor.door' });
   });
 
   it('falls back to a tile', () => {
-    expect(defaultEntityCardConfig('switch.plug', hass)).toEqual({ type: 'tile', entity: 'switch.plug' });
-    expect(defaultEntityCardConfig('light.missing')).toMatchObject({ type: 'tile', state_content: 'state' });
+    expect(haFallbackEntityCardConfig('switch.plug', hass)).toEqual({ type: 'tile', entity: 'switch.plug' });
+    expect(haFallbackEntityCardConfig('light.missing')).toMatchObject({ type: 'tile', state_content: 'state' });
   });
 });
 
@@ -171,7 +171,7 @@ describe('resolveEntityCardConfig', () => {
     expect(card.icon).toBe('mdi:coffee');
   });
 
-  it('shows i18n texts in the viewer language', () => {
+  it('uses the English blueprint text for every viewer language', () => {
     const rule = assignment('Localized', 'tile', {
       blueprint: [
         'blueprint:',
@@ -191,21 +191,25 @@ describe('resolveEntityCardConfig', () => {
       entity: 'switch.plug',
       surface: 'area_cards',
     });
-    expect(resolve('nl').name).toBe('Stekker');
+    expect(resolve('nl').name).toBe('Plug');
     expect(resolve('fr').name).toBe('Plug');
   });
 
-  it('uses the default card when the rule is disabled', () => {
+  it('uses the Mushroom card when the rule is disabled', () => {
     const card = resolveEntityCardConfig({
       hass,
       config: config(assignment('Off', 'tile', { enabled: false })),
       entity: 'switch.plug',
       surface: 'area_cards',
     });
-    expect(card).toEqual({ type: 'tile', entity: 'switch.plug' });
+    expect(card).toEqual({
+      type: 'custom:mushroom-entity-card',
+      entity: 'switch.plug',
+      layout: 'vertical',
+    });
   });
 
-  it('uses the default card when the blueprint is broken', () => {
+  it('uses the Mushroom card when the blueprint is broken', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const card = resolveEntityCardConfig({
       hass,
@@ -213,7 +217,11 @@ describe('resolveEntityCardConfig', () => {
       entity: 'switch.plug',
       surface: 'area_cards',
     });
-    expect(card).toEqual({ type: 'tile', entity: 'switch.plug' });
+    expect(card).toEqual({
+      type: 'custom:mushroom-entity-card',
+      entity: 'switch.plug',
+      layout: 'vertical',
+    });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

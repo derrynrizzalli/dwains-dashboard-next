@@ -85,6 +85,8 @@ export class DwainsDashboardStrategy implements LovelaceStrategy {
       pages: config.pages || [],
       // Pass through replace-card blueprints
       blueprint_replacements: config.blueprint_replacements || {},
+      // Per-type Mushroom (or template) card overrides. Absent until configured.
+      mushroom_tile_overrides: config.mushroom_tile_overrides,
       // Pass through device admission / hidden devices
       device_admission: config.device_admission || {}
     };
