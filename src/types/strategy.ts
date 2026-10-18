@@ -1,4 +1,5 @@
 import type { HomeAssistant } from './home-assistant';
+import type { MushroomTileOverrides } from '../utils/mushroom-tiles';
 
 export interface LovelaceStrategy {
   generate(config: LovelaceStrategyConfig, hass: HomeAssistant): Promise<LovelaceConfig>;
@@ -226,6 +227,9 @@ export interface DwainsDashboardConfig {
   pages?: BlueprintPage[];
   // Replace-card blueprints voor standaard entity-kaarten in area/devices views.
   blueprint_replacements?: BlueprintReplacements;
+  // Per tile type, a Lovelace card (usually a Mushroom or mushroom-template card)
+  // used instead of the built-in Mushroom map. The dashboard fills `entity`.
+  mushroom_tile_overrides?: MushroomTileOverrides;
   // Device visibility and first-seen tracking for DD.
   device_admission?: DeviceAdmission;
 }

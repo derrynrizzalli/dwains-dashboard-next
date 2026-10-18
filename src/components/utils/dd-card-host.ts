@@ -1,9 +1,12 @@
+import { ensureMushroomAvailable, isMushroomCardType } from '../../utils/mushroom-tiles';
+
 // Generieke host voor een willekeurige Lovelace-kaart-config. Maakt de echte
 // kaart via Home Assistants card helpers en beheert die in de eigen light-DOM,
 // zodat er nooit een rauw DOM-element in een Lit-template van de ouder belandt.
 export class DwainsCardHost extends HTMLElement {
   private _hass: any | undefined;
   private _config: any | undefined;
+  private _fallbackConfig: any | undefined;
   private _configKey = '';
   private _renderedConfigKey = '';
   private _child: any | null = null;
@@ -21,11 +24,25 @@ export class DwainsCardHost extends HTMLElement {
 
   set config(value: any) {
     this._config = value;
-    this._configKey = this._getConfigKey(value);
+    this._rememberConfigKey();
     this._renderWhenVisible();
   }
   get config() {
     return this._config;
+  }
+
+  /** Card used when `config` is a Mushroom card and lovelace-mushroom is missing. */
+  set fallbackConfig(value: any) {
+    this._fallbackConfig = value;
+    this._rememberConfigKey();
+    this._renderWhenVisible();
+  }
+  get fallbackConfig() {
+    return this._fallbackConfig;
+  }
+
+  private _rememberConfigKey(): void {
+    this._configKey = `${this._getConfigKey(this._config)}|${this._getConfigKey(this._fallbackConfig)}`;
   }
 
   connectedCallback() {
@@ -82,18 +99,24 @@ export class DwainsCardHost extends HTMLElement {
   private async _render() {
     if (!this.isConnected || !this._config) return;
 
+    const request = ++this._renderRequest;
+    const requestedKey = this._configKey;
+    let config = this._config;
+    if (isMushroomCardType(config?.type)) {
+      const ready = await ensureMushroomAvailable();
+      if (request !== this._renderRequest || !this.isConnected || requestedKey !== this._configKey) return;
+      if (!ready && this._fallbackConfig) config = this._fallbackConfig;
+    }
+    const configKey = this._getConfigKey(config);
+
     if (
       this._child &&
       this.contains(this._child) &&
-      this._renderedConfigKey === this._configKey
+      this._renderedConfigKey === configKey
     ) {
       if (this._hass) this._child.hass = this._hass;
       return;
     }
-
-    const request = ++this._renderRequest;
-    const config = this._config;
-    const configKey = this._configKey;
 
     try {
       const loadCardHelpers = (window as any).loadCardHelpers;
@@ -105,7 +128,7 @@ export class DwainsCardHost extends HTMLElement {
       if (
         request !== this._renderRequest ||
         !this.isConnected ||
-        configKey !== this._configKey
+        requestedKey !== this._configKey
       ) {
         return;
       }

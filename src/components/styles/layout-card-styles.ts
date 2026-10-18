@@ -3527,6 +3527,68 @@ export const layoutCardStyles = css`
       width: 100%;
     }
 
+    .mobile-entity-mushroom-card,
+    .favorite-mushroom-card {
+      box-sizing: border-box;
+      min-width: 0;
+      min-height: 128px;
+      display: flex;
+      flex-direction: column;
+      scroll-snap-align: start;
+    }
+
+    .mobile-entity-mushroom-card {
+      flex: 0 0 180px;
+    }
+
+    .mobile-entities-section.layout-grid .mobile-entity-mushroom-card {
+      width: 100%;
+      flex: none;
+      scroll-snap-align: none;
+    }
+
+    .favorite-mushroom-card {
+      flex: 0 0 186px;
+      width: auto;
+    }
+
+    .favorites-grid .favorite-mushroom-card {
+      width: 100%;
+      flex: none;
+      scroll-snap-align: none;
+    }
+
+    .home-favorites-section .favorites-grid > .favorite-mushroom-card {
+      flex: 0 0 186px;
+      width: auto;
+      scroll-snap-align: start;
+    }
+
+    .home-favorites-section.layout-grid .favorites-grid > .favorite-mushroom-card {
+      width: 100%;
+      flex: none;
+      scroll-snap-align: none;
+    }
+
+    .mobile-entity-mushroom-card.is-pending,
+    .favorite-mushroom-card.is-pending {
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--card-background-color) 88%, transparent);
+    }
+
+    .mobile-entity-mushroom-card dwains-dashboard-next-card-host,
+    .favorite-mushroom-card dwains-dashboard-next-card-host,
+    .favorite-tile-wrapper dwains-dashboard-next-tile-host,
+    .mobile-entity-mushroom-card dwains-dashboard-next-card-host > *,
+    .favorite-mushroom-card dwains-dashboard-next-card-host > *,
+    .favorite-tile-wrapper dwains-dashboard-next-tile-host > * {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      height: 100%;
+      box-sizing: border-box;
+    }
+
     .mobile-todo-list-card {
       box-sizing: border-box;
       flex: 0 0 min(100%, 520px);
@@ -3905,6 +3967,14 @@ export const layoutCardStyles = css`
         flex: none;
         padding: 16px;
         border-radius: 12px;
+        scroll-snap-align: none;
+      }
+
+      .area-view .mobile-entity-mushroom-card,
+      .area-view .mobile-entities-section.layout-grid .mobile-entity-mushroom-card {
+        width: 100%;
+        min-width: 0;
+        flex: none;
         scroll-snap-align: none;
       }
 

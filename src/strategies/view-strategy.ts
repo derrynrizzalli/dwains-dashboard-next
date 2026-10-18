@@ -29,6 +29,7 @@ export class DwainsViewStrategy implements LovelaceViewStrategy {
           home_custom_cards: config.home_custom_cards || [],
           pages: config.pages || [],
           blueprint_replacements: config.blueprint_replacements || {},
+          mushroom_tile_overrides: config.mushroom_tile_overrides,
           device_admission: config.device_admission || {}
           // Remove hass from config - it's provided automatically by Home Assistant
         }

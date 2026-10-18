@@ -8,22 +8,11 @@ Dwains Dashboard Next follows the language selected in the Home Assistant user p
 
 ## Supported Languages
 
-- English (`en`)
-- Dutch (`nl`)
-- German (`de`)
-- French (`fr`)
-- Spanish (`es`)
-- Traditional Chinese (`zh-Hant`)
-- Simplified Chinese (`zh-Hans`)
-- Russian (`ru`)
-- Italian (`it`)
-- Brazilian Portuguese (`pt-BR`)
-
-Regional language codes are supported automatically. For example, `de-DE`, `fr-FR`, and `es-ES` use their matching base language. Chinese script and regional codes such as `zh-Hant`, `zh-Hans`, `zh-TW`, and `zh-CN` are recognized automatically. Unsupported languages fall back to English.
+This build ships English (`en`) only. Every other Home Assistant language uses the English dictionary.
 
 ## Translation Files
 
-Translations are stored in `src/i18n/locales`. English is the source dictionary and every supported language must contain the same keys.
+Translations are stored in `src/i18n/locales/en.ts`. English is the only dictionary.
 
 Variables inside translations use braces, for example `{count}` or `{name}`. Singular and plural text uses matching `.one` and `.other` keys.
 
@@ -39,7 +28,4 @@ The check fails when a language is missing a key, contains an empty value, chang
 
 ## Add a Language
 
-1. Copy the English dictionary and translate every value.
-2. Add the language to `src/i18n/index.ts`.
-3. Keep placeholders unchanged.
-4. Run `npm run i18n:check`, `npm run type-check`, and `npm run build`.
+This fork does not load extra languages. Adding one means restoring a dictionary under `src/i18n/locales` and a loader in `src/i18n/index.ts`, then running `npm run i18n:check`.

@@ -17,6 +17,7 @@ import {
 } from './blueprints';
 import { getEntityRegistry } from './entity-registry';
 import { ddLang } from './localize';
+import { resolveEntityTileCard, type MushroomTileOverrides } from './mushroom-tiles';
 
 interface ResolveReplacementParams {
   hass: HomeAssistant;
@@ -27,7 +28,8 @@ interface ResolveReplacementParams {
 
 const parsedCache = new WeakMap<BlueprintReplacementAssignment, ParsedBlueprint>();
 
-export function defaultEntityCardConfig(entityId: string, hass?: HomeAssistant): LovelaceCardConfig {
+/** Home Assistant card used when lovelace-mushroom is not available. */
+export function haFallbackEntityCardConfig(entityId: string, hass?: HomeAssistant): LovelaceCardConfig {
   const domain = entityId.split('.')[0] || '';
   if (domain === 'climate') return { type: 'thermostat', entity: entityId };
   if (domain === 'camera') return { type: 'picture-entity', entity: entityId, camera_view: 'live' };
@@ -116,10 +118,23 @@ function defaultBinarySensorCardConfig(entityId: string, hass?: HomeAssistant): 
   };
 }
 
+/** Mushroom card for the entity, or a todo-list card. A stored per-type override wins over the built-in map. */
+export function defaultEntityCardConfig(
+  entityId: string,
+  _hass?: HomeAssistant,
+  overrides?: MushroomTileOverrides
+): LovelaceCardConfig {
+  return resolveEntityTileCard({ entityId, overrides });
+}
+
+function mushroomDefaultCard(params: ResolveReplacementParams, entityId: string): LovelaceCardConfig {
+  return defaultEntityCardConfig(entityId, params.hass, params.config?.mushroom_tile_overrides);
+}
+
 export function resolveEntityCardConfig(params: ResolveReplacementParams): LovelaceCardConfig {
   const entityId = typeof params.entity === 'string' ? params.entity : params.entity.entity_id;
   const assignment = findReplacementAssignment(params);
-  if (!assignment || assignment.enabled === false) return defaultEntityCardConfig(entityId, params.hass);
+  if (!assignment || assignment.enabled === false) return mushroomDefaultCard(params, entityId);
 
   try {
     const parsed = parsedAssignment(assignment);
@@ -131,7 +146,7 @@ export function resolveEntityCardConfig(params: ResolveReplacementParams): Lovel
     return localizeBlueprintConfig(resolveBlueprintCard(parsed.card, parsed.meta, values), ddLang(params.hass));
   } catch (e) {
     console.warn('Dwains replacement blueprint failed; using default card.', assignment.name, e);
-    return defaultEntityCardConfig(entityId, params.hass);
+    return mushroomDefaultCard(params, entityId);
   }
 }
 

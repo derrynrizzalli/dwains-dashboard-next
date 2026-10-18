@@ -80,7 +80,7 @@ async function loadUiElements(): Promise<void> {
     import('./components/cards/dwains-heading-card'),
     import('./components/dwains-layout-card'),
     import('./components/dwains-page-card'),
-    import('./components/dwains-devices-card'),
+    import('./components/dwains-devices-card-shell'),
     import('./components/dwains-bottom-nav'),
   ]));
 
